@@ -27,7 +27,3 @@ void write_constants(Constants* constants, Value value) {
 
   constants->count++;
 }
-
-void print_value(Value value) {
-  printf("%g", value);
-}

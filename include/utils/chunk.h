@@ -6,6 +6,9 @@
 
 #define FOREACH(OPERATION) \
   OPERATION(OP_CONSTANT) \
+  OPERATION(OP_POSITIVE) OPERATION(OP_NEGATIVE) \
+  OPERATION(OP_ADD) OPERATION(OP_SUBTRACT) \
+  OPERATION(OP_MULTIPLY) OPERATION(OP_DIVIDE) \
   OPERATION(OP_RETURN) 
 
 #define ENUMERATE(ENUMERATION) ENUMERATION,
@@ -15,10 +18,6 @@
 typedef enum {
   FOREACH(ENUMERATE)
 } Operations;
-
-static const char* stringified_operations[] = {
-  FOREACH(STRINGIFY)
-};
 
 typedef struct {
   int count;

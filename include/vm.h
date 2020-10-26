@@ -13,18 +13,24 @@ typedef enum {
 } Results;
 
 typedef struct {
-  Chunk* chunk;
-  
-  Value stack[STACK_MAX];
+  Value content[STACK_MAX];
   Value* top;
+} Stack;
+
+void initialize_stack(Stack* stack);
+void free_stack(Stack* stack);
+
+void push(Stack* stack, Value value);
+Value pop(Stack* stack);
+
+typedef struct {
+  Chunk* chunk;
+  Stack stack;
 } VM;
 
 void initialize_VM(VM* vm);
 void free_VM(VM* vm);
 
-void push(VM* vm, Value value);
-Value pop(VM* vm);
-
-Results interpret(VM* vm, Chunk* chunk);
+Results interpret(VM* vm, const char* source);
 
 #endif

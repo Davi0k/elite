@@ -15,6 +15,4 @@ void initialize_constants(Constants* constants);
 void free_constants(Constants* constants);
 void write_constants(Constants* constants, Value value);
 
-void print_value(Value value);
-
 #endif

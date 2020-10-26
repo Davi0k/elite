@@ -1,8 +1,6 @@
 cmake_minimum_required(VERSION 3.17.3)
 
 project(elite)
-
-set(CMAKE_C_EXTENSIONS ON)
  
 include_directories(include)
  
