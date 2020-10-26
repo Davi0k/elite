@@ -75,19 +75,3 @@ void print_stack(Stack* stack) {
 
   printf("\n");
 }
-
-void print_tokenizer(const char* source) {
-  Tokenizer tokenizer;
-
-  initialize_tokenizer(&tokenizer, source);
-
-  while(true) {
-    Token token = scan(&tokenizer);
-    
-    printf("%d ", token.line);
-
-    printf("%2d <%.*s>\n", token.type, token.length, token.start); 
-
-    if (token.type == TOKEN_EOF) break;
-  }
-}

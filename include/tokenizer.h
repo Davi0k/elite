@@ -34,7 +34,7 @@ typedef struct {
   int line;
 } Tokenizer;
 
-void initialize_tokenizer(Tokenizer* tokenizer, const char* source);
+void set_tokenizer(Tokenizer* tokenizer, const char* source);
 
 Token scan(Tokenizer* tokenizer);
 

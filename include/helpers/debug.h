@@ -13,6 +13,4 @@ void print_value(Value value);
 
 void print_stack(Stack* stack);
 
-void print_tokenizer(const char* source);
-
 #endif

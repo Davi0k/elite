@@ -45,11 +45,11 @@ static Results run(VM* vm) {
       push(&vm->stack, left operator right); \
     } while(false) 
   
+  register uint8_t* ip = vm->chunk->code;
+
   static void* jump_table[] = {
     FOREACH(COMPUTED)
   };
-
-  register uint8_t* ip = vm->chunk->code;
 
   goto *jump_table[*ip];
 
@@ -100,9 +100,20 @@ static Results run(VM* vm) {
 }
 
 Results interpret(VM* vm, const char* source) {
-  compile(vm, source);
+  Chunk chunk;
 
-  return INTERPRET_OK;
-  
-  return run(vm);
+  initialize_chunk(&chunk);
+
+  if(!compile(&chunk, source)) {
+    free_chunk(&chunk);
+    return INTERPRET_COMPILE_ERROR;
+  }
+
+  vm->chunk = &chunk;
+
+  Results result = run(vm);
+
+  free_chunk(&chunk);
+
+  return result;
 }

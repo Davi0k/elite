@@ -2,7 +2,16 @@
 #define COMPILER_H
 
 #include "vm.h"
+#include "tokenizer.h"
 
-void compile(VM* vm, const char* source);
+typedef struct {
+  Tokenizer tokenizer;
+  Token current;
+  Token previous;
+  bool error;
+  bool panic;
+} Parser;
+
+bool compile(Chunk* chunk, const char* source);
 
 #endif
