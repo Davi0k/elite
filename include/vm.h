@@ -17,8 +17,7 @@ typedef struct {
   Value* top;
 } Stack;
 
-void initialize_stack(Stack* stack);
-void free_stack(Stack* stack);
+void reset_stack(Stack* stack);
 
 void push(Stack* stack, Value value);
 Value pop(Stack* stack);

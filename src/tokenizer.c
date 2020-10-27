@@ -138,33 +138,15 @@ static Types trie(Tokenizer* tokenizer) {
     case 'f': 
       if (tokenizer->current - tokenizer->start > 1) {
         switch (tokenizer->start[1]) {
-          case 'a': return keyword(tokenizer, 2, 2, "lse", TOKEN_FALSE);
+          case 'a': return keyword(tokenizer, 2, 3, "lse", TOKEN_FALSE);
           case 'o': return keyword(tokenizer, 2, 1, "r", TOKEN_FOR);
         }
       }
 
       break;
 
-    case 'g':
-      if (tokenizer->current - tokenizer->start > 1) {
-        switch (tokenizer->start[1]) {
-          case 'e': return keyword(tokenizer, 2, 1, "t", TOKEN_GET);
-          case 'l': return keyword(tokenizer, 2, 4, "obal", TOKEN_GLOBAL);
-        }
-      }
-
-      break;
-
-    case 'i':
-      if (tokenizer->current - tokenizer->start > 1) {
-        switch (tokenizer->start[1]) {
-          case 'f': return keyword(tokenizer, 2, 0, "\0", TOKEN_IF);
-          case 'n': return keyword(tokenizer, 2, 4, "voke", TOKEN_INVOKE);
-        }
-      }
-
-      break;
-
+    case 'g': return keyword(tokenizer, 1, 2, "et", TOKEN_GET);
+    case 'i': return keyword(tokenizer, 1, 1, "f", TOKEN_IF);
     case 'n': return keyword(tokenizer, 1, 2, "ot", TOKEN_NOT);
     case 'o': return keyword(tokenizer, 1, 1, "r", TOKEN_OR);
     case 'p': return keyword(tokenizer, 1, 4, "rint", TOKEN_PRINT);
@@ -230,6 +212,9 @@ Token scan(Tokenizer* tokenizer) {
     case '(': return make(tokenizer, TOKEN_OPEN_PARENTHESES);
     case ')': return make(tokenizer, TOKEN_CLOSE_PARENTHESES);
 
+    case '[': return make(tokenizer, TOKEN_OPEN_BRACKETS);
+    case ']': return make(tokenizer, TOKEN_CLOSE_BRACKETS);
+
     case '{': return make(tokenizer, TOKEN_OPEN_BRACES);
     case '}': return make(tokenizer, TOKEN_CLOSE_BRACES);
 
@@ -246,12 +231,12 @@ Token scan(Tokenizer* tokenizer) {
     case '&': return make(tokenizer, TOKEN_AND);
     case '|': return make(tokenizer, TOKEN_OR);
 
-    case '!': return make(tokenizer, match(tokenizer, '=') ? TOKEN_NOT_EQUALS : TOKEN_NOT);
+    case '!': return make(tokenizer, match(tokenizer, '=') ? TOKEN_NOT_EQUAL : TOKEN_NOT);
 
-    case '<': return make(tokenizer, match(tokenizer, '=') ? TOKEN_LESS_EQUALS : TOKEN_LESS);
-    case '>': return make(tokenizer, match(tokenizer, '=') ? TOKEN_GREATER_EQUALS : TOKEN_GREATER);
+    case '<': return make(tokenizer, match(tokenizer, '=') ? TOKEN_LESS_EQUAL : TOKEN_LESS);
+    case '>': return make(tokenizer, match(tokenizer, '=') ? TOKEN_GREATER_EQUAL : TOKEN_GREATER);
 
-    case '=': return make(tokenizer, match(tokenizer, '=') ? TOKEN_EQUALS : TOKEN_ASSIGN);
+    case '=': return make(tokenizer, match(tokenizer, '=') ? TOKEN_EQUAL : TOKEN_ASSIGN);
 
     case '\'':
     case '"':

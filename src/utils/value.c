@@ -27,3 +27,25 @@ void write_constants(Constants* constants, Value value) {
 
   constants->count++;
 }
+
+bool equal(Value left, Value right) {
+  if (left.type != right.type) return false;
+
+  switch (left.type) {
+    case VALUE_NUMBER: return AS_NUMBER(left) == AS_NUMBER(right); 
+    case VALUE_BOOLEAN: return AS_BOOLEAN(left) == AS_BOOLEAN(right);
+    case VALUE_VOID: return true;
+
+    default: return false;
+  }
+}
+
+void print_value(Value value) {
+  switch (value.type) {
+    case VALUE_NUMBER: printf("%f", AS_NUMBER(value)); break;
+
+    case VALUE_BOOLEAN: printf(AS_BOOLEAN(value) ? "true" : "false"); break;
+
+    case VALUE_VOID: printf("void"); break;
+  }
+}

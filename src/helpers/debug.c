@@ -45,13 +45,20 @@ int disassemble_instruction(Chunk* chunk, int offset) {
     case OP_CONSTANT:
       return constant_representation(strings[instruction], chunk, offset);
 
+    case OP_TRUE:
+    case OP_FALSE:
+    case OP_VOID:
     case OP_POSITIVE:
     case OP_NEGATIVE:
     case OP_ADD:
     case OP_SUBTRACT:
     case OP_MULTIPLY:
     case OP_DIVIDE:
-    case OP_RETURN:
+    case OP_NOT:
+    case OP_EQUAL:
+    case OP_GREATER:
+    case OP_LESS:
+    case OP_EXIT:
       return simple_representation(strings[instruction], offset);
 
     default:
@@ -60,17 +67,11 @@ int disassemble_instruction(Chunk* chunk, int offset) {
   }
 }
 
-void print_value(Value value) {
-  printf("%g", value);
-}
-
 void print_stack(Stack* stack) {
   for (Value* slot = stack->content; slot < stack->top; slot++) {
     printf("[ ");
     print_value(*slot);
     printf(" ]");
-
-    printf("\n");
   }
 
   printf("\n");

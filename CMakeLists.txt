@@ -4,7 +4,7 @@ project(elite)
  
 include_directories(include)
  
-file(GLOB SOURCES "src/*.c")
+file(GLOB SOURCES "src/*.c") 
 file(GLOB HELPERS "src/helpers/*.c")
 file(GLOB UTILS "src/utils/*.c")
 

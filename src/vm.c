@@ -1,23 +1,22 @@
 #include <stdio.h>
+#include <stdarg.h>
 
 #include "common.h"
 #include "compiler.h"
 #include "vm.h"
 
+#include "helpers/debug.h"
+
 void initialize_VM(VM* vm) {
-  initialize_stack(&vm->stack);
+  reset_stack(&vm->stack);
 }
 
 void free_VM(VM* vm) {
-  free_stack(&vm->stack);
+
 }
 
-void initialize_stack(Stack* stack) {
+void reset_stack(Stack* stack) {
   stack->top = stack->content;
-}
-
-void free_stack(Stack* stack) {
-  stack->top = 0;
 }
 
 void push(Stack* stack, Value value) {
@@ -31,6 +30,32 @@ Value pop(Stack* stack) {
   return *stack->top;
 }
 
+static Value peek(Stack* stack, int distance) {
+  return stack->top[- 1 - distance];
+}
+
+static bool falsey(Value value) {
+  return IS_VOID(value) || (IS_BOOLEAN(value) && AS_BOOLEAN(value) == false);
+}
+
+static void runtime(VM* vm, uint8_t* ip, const char* message, ...) {
+  va_list list;
+
+  va_start(list, message);
+
+  vfprintf(stderr, message, list);
+
+  va_end(list);
+
+  fputs("\n", stderr);
+
+  size_t instruction = ip - vm->chunk->code - 1;
+  int line = vm->chunk->lines[instruction];
+  fprintf(stderr, "[Line %d] in script\n", line);
+
+  reset_stack(&vm->stack);
+}
+
 static Results run(VM* vm) {
   #define READ_BYTE() ( *++ip )
 
@@ -38,11 +63,15 @@ static Results run(VM* vm) {
 
   #define COMPUTE_NEXT() goto *jump_table[READ_BYTE()]
 
-  #define BINARY_OPERATION(operator) \
+  #define BINARY_OPERATION(type, operator) \
     do { \
-      Value right = pop(&vm->stack); \
-      Value left = pop(&vm->stack); \
-      push(&vm->stack, left operator right); \
+      if (!IS_NUMBER(peek(&vm->stack, 0)) || !IS_NUMBER(peek(&vm->stack, 1))) { \
+        runtime(vm, ip, "Operands must be Numbers."); \
+        return INTERPRET_RUNTIME_ERROR; \
+      } \
+      double right = AS_NUMBER(pop(&vm->stack)); \
+      double left = AS_NUMBER(pop(&vm->stack)); \
+      push(&vm->stack, type(left operator right)); \
     } while(false) 
   
   register uint8_t* ip = vm->chunk->code;
@@ -60,37 +89,65 @@ static Results run(VM* vm) {
       COMPUTE_NEXT();
     } while(false);
 
+  OP_TRUE: push(&vm->stack, BOOLEAN(true)); COMPUTE_NEXT();
+
+  OP_FALSE: push(&vm->stack, BOOLEAN(false)); COMPUTE_NEXT();
+
+  OP_VOID: push(&vm->stack, VOID); COMPUTE_NEXT();
+
   OP_POSITIVE:
-    do {
-      Value constant = +pop(&vm->stack);
-      push(&vm->stack, constant);
-      COMPUTE_NEXT();
-    } while(false);
+    if (!IS_NUMBER(peek(&vm->stack, 0))) {
+      runtime(vm, ip, "Operand must be a Number.");
+      return INTERPRET_RUNTIME_ERROR;
+    }
+
+    push(&vm->stack, NUMBER(+AS_NUMBER(pop(&vm->stack))));
+
+    COMPUTE_NEXT();
 
   OP_NEGATIVE:
+    if (!IS_NUMBER(peek(&vm->stack, 0))) {
+      runtime(vm, ip, "Operand must be a Number.");
+      return INTERPRET_RUNTIME_ERROR;
+    }
+
+    push(&vm->stack, NUMBER(-AS_NUMBER(pop(&vm->stack))));
+
+    COMPUTE_NEXT();
+  
+  OP_ADD: BINARY_OPERATION(NUMBER, +); COMPUTE_NEXT();
+
+  OP_SUBTRACT: BINARY_OPERATION(NUMBER, -); COMPUTE_NEXT();
+
+  OP_MULTIPLY: BINARY_OPERATION(NUMBER, *); COMPUTE_NEXT();
+
+  OP_DIVIDE: BINARY_OPERATION(NUMBER, /); COMPUTE_NEXT();
+
+  OP_NOT:
     do {
-      Value constant = -pop(&vm->stack);
-      push(&vm->stack, constant);
+      bool result = falsey(pop(&vm->stack));
+      push(&vm->stack, BOOLEAN(result));
       COMPUTE_NEXT();
     } while(false);
-  
-  OP_ADD:
-    BINARY_OPERATION(+);
-    COMPUTE_NEXT();
 
-  OP_SUBTRACT:
-    BINARY_OPERATION(-);
-    COMPUTE_NEXT();
+  OP_EQUAL:
+    do {
+      Value right = pop(&vm->stack);
+      Value left = pop(&vm->stack);
 
-  OP_MULTIPLY:
-    BINARY_OPERATION(*);
-    COMPUTE_NEXT();
+      bool result = equal(left, right);
 
-  OP_DIVIDE:
-    BINARY_OPERATION(/);
-    COMPUTE_NEXT();
+      push(&vm->stack, BOOLEAN(result));
 
-  OP_RETURN:
+      COMPUTE_NEXT();
+    } while(false);
+
+  OP_GREATER: BINARY_OPERATION(BOOLEAN, >); COMPUTE_NEXT();
+
+  OP_LESS: BINARY_OPERATION(BOOLEAN, <); COMPUTE_NEXT();
+
+  OP_EXIT: 
+    print_stack(&vm->stack);
     return INTERPRET_OK;
 
   #undef READ_BYTE
