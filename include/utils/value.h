@@ -3,7 +3,6 @@
 
 #include "common.h"
 
-#define NUMBER(value) ( (Value){ VALUE_NUMBER, { .number = value } } )
 #define BOOLEAN(value) ( (Value){ VALUE_BOOLEAN, { .boolean = value } } )
 #define VOID ( (Value){ VALUE_VOID, { .number = 0 } } )
 
@@ -24,7 +23,7 @@ typedef struct {
   Values type;
 
   union {
-    double number;
+    mpf_t number;
     bool boolean;
   } content;
 } Value;
@@ -34,6 +33,8 @@ typedef struct {
   int count;
   Value* values;
 } Constants;
+
+Value NUMBER(mpf_t number);
 
 void initialize_constants(Constants* constants);
 void free_constants(Constants* constants);

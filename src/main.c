@@ -7,7 +7,7 @@
 #include "common.h"
 #include "vm.h"
 
-#define MAX_CHARACTERS 1024
+#define MAX_CHARACTERS 2048
 
 static char* read(const char* path) {
   FILE* file = fopen(path, "rb");
@@ -72,7 +72,10 @@ static void execute_file(VM* vm, const char* path) {
   if (result == INTERPRET_RUNTIME_ERROR) exit(70);
 }
 
+
 int main(int argc, const char* argv[]) {
+  mpf_set_default_prec(GMP_MAX_PRECISION);
+
   VM vm;
 
   initialize_VM(&vm);

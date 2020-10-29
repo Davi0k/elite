@@ -3,6 +3,16 @@
 #include "utils/memory.h"
 #include "utils/value.h"
 
+Value NUMBER(mpf_t number) {
+  Value value;
+
+  value.type = VALUE_NUMBER;
+
+  mpf_init_set(value.content.number, number);
+
+  return value;
+}
+
 void initialize_constants(Constants* constants) {
   constants->values = NULL;
   constants->capacity = 0;
@@ -32,7 +42,7 @@ bool equal(Value left, Value right) {
   if (left.type != right.type) return false;
 
   switch (left.type) {
-    case VALUE_NUMBER: return AS_NUMBER(left) == AS_NUMBER(right); 
+    case VALUE_NUMBER: return mpf_cmp(AS_NUMBER(left), AS_NUMBER(right)) == 0; 
     case VALUE_BOOLEAN: return AS_BOOLEAN(left) == AS_BOOLEAN(right);
     case VALUE_VOID: return true;
 
@@ -42,7 +52,7 @@ bool equal(Value left, Value right) {
 
 void print_value(Value value) {
   switch (value.type) {
-    case VALUE_NUMBER: printf("%f", AS_NUMBER(value)); break;
+    case VALUE_NUMBER: gmp_printf("%.Ff", AS_NUMBER(value)); break;
 
     case VALUE_BOOLEAN: printf(AS_BOOLEAN(value) ? "true" : "false"); break;
 

@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "common.h"
 #include "compiler.h"
@@ -147,9 +148,17 @@ static void constant(Parser* parser, Value value) {
 }
 
 static void number(Parser* parser) {
-  double number = strtod(parser->previous.start, NULL);
+  char string[parser->previous.length + 1];
 
-  Value value = NUMBER(number);
+  strncpy(string, parser->previous.start, parser->previous.length + 1);
+
+  string[parser->previous.length] = '\0';
+
+  Value value;
+
+  value.type = VALUE_NUMBER;
+
+  mpf_init_set_str(value.content.number, string, 10);
 
   constant(parser, value);
 }
@@ -180,8 +189,7 @@ static void unary(Parser* parser) {
   parse(parser, PRECEDENCE_UNARY);
 
   switch (operator) {
-    case TOKEN_PLUS: emit(parser, OP_POSITIVE); break;
-    case TOKEN_MINUS: emit(parser, OP_NEGATIVE); break;
+    case TOKEN_MINUS: emit(parser, OP_NEGATION); break;
 
     case TOKEN_NOT: emit(parser, OP_NOT); break;
 

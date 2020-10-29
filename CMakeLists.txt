@@ -9,3 +9,5 @@ file(GLOB HELPERS "src/helpers/*.c")
 file(GLOB UTILS "src/utils/*.c")
 
 add_executable(elite ${SOURCES} ${HELPERS} ${UTILS})
+
+target_link_libraries(elite gmp)

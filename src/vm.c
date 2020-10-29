@@ -63,16 +63,30 @@ static Results run(VM* vm) {
 
   #define COMPUTE_NEXT() goto *jump_table[READ_BYTE()]
 
-  #define BINARY_OPERATION(type, operator) \
+  #define BINARY_OPERATION(operator) \
     do { \
       if (!IS_NUMBER(peek(&vm->stack, 0)) || !IS_NUMBER(peek(&vm->stack, 1))) { \
         runtime(vm, ip, "Operands must be Numbers."); \
         return INTERPRET_RUNTIME_ERROR; \
       } \
-      double right = AS_NUMBER(pop(&vm->stack)); \
-      double left = AS_NUMBER(pop(&vm->stack)); \
-      push(&vm->stack, type(left operator right)); \
+      Value right = pop(&vm->stack); \
+      Value left = pop(&vm->stack); \
+      mpf_t result; mpf_init(result); \
+      operator(result, left.content.number, right.content.number); \
+      push(&vm->stack, NUMBER(result)); \
     } while(false) 
+
+  #define BINARY_COMPARISON(operator) \
+    do { \
+      if (!IS_NUMBER(peek(&vm->stack, 0)) || !IS_NUMBER(peek(&vm->stack, 1))) { \
+        runtime(vm, ip, "Operands must be Numbers."); \
+        return INTERPRET_RUNTIME_ERROR; \
+      } \
+      Value right = pop(&vm->stack); \
+      Value left = pop(&vm->stack); \
+      bool comparison = mpf_cmp(AS_NUMBER(left), AS_NUMBER(right)) operator 0; \
+      push(&vm->stack, BOOLEAN(comparison)); \
+    } while(false)
   
   register uint8_t* ip = vm->chunk->code;
 
@@ -95,33 +109,29 @@ static Results run(VM* vm) {
 
   OP_VOID: push(&vm->stack, VOID); COMPUTE_NEXT();
 
-  OP_POSITIVE:
+  OP_NEGATION:
     if (!IS_NUMBER(peek(&vm->stack, 0))) {
       runtime(vm, ip, "Operand must be a Number.");
       return INTERPRET_RUNTIME_ERROR;
     }
 
-    push(&vm->stack, NUMBER(+AS_NUMBER(pop(&vm->stack))));
+    mpf_t number; 
+    
+    mpf_init(number);
 
-    COMPUTE_NEXT();
+    mpf_neg(number, AS_NUMBER(pop(&vm->stack)));
 
-  OP_NEGATIVE:
-    if (!IS_NUMBER(peek(&vm->stack, 0))) {
-      runtime(vm, ip, "Operand must be a Number.");
-      return INTERPRET_RUNTIME_ERROR;
-    }
-
-    push(&vm->stack, NUMBER(-AS_NUMBER(pop(&vm->stack))));
+    push(&vm->stack, NUMBER(number));
 
     COMPUTE_NEXT();
   
-  OP_ADD: BINARY_OPERATION(NUMBER, +); COMPUTE_NEXT();
+  OP_ADD: BINARY_OPERATION(mpf_add); COMPUTE_NEXT();
 
-  OP_SUBTRACT: BINARY_OPERATION(NUMBER, -); COMPUTE_NEXT();
+  OP_SUBTRACT: BINARY_OPERATION(mpf_sub); COMPUTE_NEXT();
 
-  OP_MULTIPLY: BINARY_OPERATION(NUMBER, *); COMPUTE_NEXT();
+  OP_MULTIPLY: BINARY_OPERATION(mpf_mul); COMPUTE_NEXT();
 
-  OP_DIVIDE: BINARY_OPERATION(NUMBER, /); COMPUTE_NEXT();
+  OP_DIVIDE: BINARY_OPERATION(mpf_div); COMPUTE_NEXT();
 
   OP_NOT:
     do {
@@ -142,9 +152,9 @@ static Results run(VM* vm) {
       COMPUTE_NEXT();
     } while(false);
 
-  OP_GREATER: BINARY_OPERATION(BOOLEAN, >); COMPUTE_NEXT();
+  OP_GREATER: BINARY_COMPARISON(>); COMPUTE_NEXT();
 
-  OP_LESS: BINARY_OPERATION(BOOLEAN, <); COMPUTE_NEXT();
+  OP_LESS: BINARY_COMPARISON(<); COMPUTE_NEXT();
 
   OP_EXIT: 
     print_stack(&vm->stack);
@@ -154,6 +164,7 @@ static Results run(VM* vm) {
   #undef READ_CONSTANT
   #undef COMPUTE_NEXT
   #undef BINARY_OPERATION
+  #undef BINARY_COMPARISON
 }
 
 Results interpret(VM* vm, const char* source) {
