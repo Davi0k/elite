@@ -1,7 +1,9 @@
 #include <stdio.h>
+#include <string.h>
 
 #include "utils/memory.h"
 #include "utils/value.h"
+#include "utils/object.h"
 
 Value NUMBER(mpf_t number) {
   Value value;
@@ -44,6 +46,14 @@ bool equal(Value left, Value right) {
   switch (left.type) {
     case VALUE_NUMBER: return mpf_cmp(AS_NUMBER(left), AS_NUMBER(right)) == 0; 
     case VALUE_BOOLEAN: return AS_BOOLEAN(left) == AS_BOOLEAN(right);
+    
+    case VALUE_OBJECT: {
+      String* a = AS_STRING(left);
+      String* b = AS_STRING(right);
+
+      return a->length == b->length && memcmp(a->content, b->content, a->length) == 0;
+    }
+
     case VALUE_VOID: return true;
 
     default: return false;
@@ -55,6 +65,8 @@ void print_value(Value value) {
     case VALUE_NUMBER: gmp_printf("%.Ff", AS_NUMBER(value)); break;
 
     case VALUE_BOOLEAN: printf(AS_BOOLEAN(value) ? "true" : "false"); break;
+
+    case VALUE_OBJECT: print_object(value); break;
 
     case VALUE_VOID: printf("void"); break;
   }

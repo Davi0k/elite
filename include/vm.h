@@ -25,6 +25,8 @@ Value pop(Stack* stack);
 typedef struct {
   Chunk* chunk;
   Stack stack;
+
+  Object* objects;
 } VM;
 
 void initialize_VM(VM* vm);

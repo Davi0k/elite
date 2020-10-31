@@ -8,6 +8,8 @@
 #include "tokenizer.h"
 #include "vm.h"
 
+#include "utils/object.h"
+
 static void espression(Parser* parser);
 static void parse(Parser* parser, Precedences precedence);
 
@@ -16,6 +18,7 @@ static void unary(Parser* parser);
 static void binary(Parser* parser);
 
 static void number(Parser* parser);
+static void string(Parser* parser);
 static void literal(Parser* parser);
 
 Rule rules[] = { 
@@ -28,7 +31,7 @@ Rule rules[] = {
 
   [ TOKEN_IDENTIFIER ] = { NULL, NULL, PRECEDENCE_NONE },
   [ TOKEN_NUMBER ] = { number, NULL, PRECEDENCE_NONE },
-  [ TOKEN_STRING ] = { NULL, NULL, PRECEDENCE_NONE },
+  [ TOKEN_STRING ] = { string, NULL, PRECEDENCE_NONE },
   [ TOKEN_VOID ] = { literal, NULL, PRECEDENCE_NONE },
 
   [ TOKEN_TRUE ] = { literal, NULL, PRECEDENCE_NONE },
@@ -159,6 +162,14 @@ static void number(Parser* parser) {
   value.type = VALUE_NUMBER;
 
   mpf_init_set_str(value.content.number, string, 10);
+
+  constant(parser, value);
+}
+
+static void string(Parser* parser) {
+  String* string = copy_string(parser->previous.start + 1, parser->previous.length - 2);
+
+  Value value = OBJECT(string);
 
   constant(parser, value);
 }

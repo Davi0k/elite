@@ -1,14 +1,20 @@
 #include <stdio.h>
 #include <stdarg.h>
+#include <string.h>
 
 #include "common.h"
 #include "compiler.h"
 #include "vm.h"
 
+#include "utils/memory.h"
+#include "utils/object.h"
+
 #include "helpers/debug.h"
 
 void initialize_VM(VM* vm) {
   reset_stack(&vm->stack);
+
+  vm->objects = NULL;
 }
 
 void free_VM(VM* vm) {
@@ -78,14 +84,22 @@ static Results run(VM* vm) {
 
   #define BINARY_COMPARISON(operator) \
     do { \
-      if (!IS_NUMBER(peek(&vm->stack, 0)) || !IS_NUMBER(peek(&vm->stack, 1))) { \
-        runtime(vm, ip, "Operands must be Numbers."); \
-        return INTERPRET_RUNTIME_ERROR; \
+      if (IS_NUMBER(peek(&vm->stack, 0)) && IS_NUMBER(peek(&vm->stack, 1))) { \
+        Value right = pop(&vm->stack); \
+        Value left = pop(&vm->stack); \
+        bool comparison = mpf_cmp(AS_NUMBER(left), AS_NUMBER(right)) operator 0; \
+        push(&vm->stack, BOOLEAN(comparison)); \
+        COMPUTE_NEXT(); \
       } \
-      Value right = pop(&vm->stack); \
-      Value left = pop(&vm->stack); \
-      bool comparison = mpf_cmp(AS_NUMBER(left), AS_NUMBER(right)) operator 0; \
-      push(&vm->stack, BOOLEAN(comparison)); \
+      if (IS_STRING(peek(&vm->stack, 0)) && IS_STRING(peek(&vm->stack, 1))) { \
+        String* right = AS_STRING(pop(&vm->stack)); \
+        String* left = AS_STRING(pop(&vm->stack)); \
+        bool comparison = left->length operator right->length && memcmp(left->content, right->content, left->length) operator 0; \
+        push(&vm->stack, BOOLEAN(comparison)); \
+        COMPUTE_NEXT(); \
+      } \
+      runtime(vm, ip, "Operands must be two Numbers or two Strings."); \
+      return INTERPRET_RUNTIME_ERROR; \
     } while(false)
   
   register uint8_t* ip = vm->chunk->code;
@@ -112,6 +126,7 @@ static Results run(VM* vm) {
   OP_NEGATION:
     if (!IS_NUMBER(peek(&vm->stack, 0))) {
       runtime(vm, ip, "Operand must be a Number.");
+
       return INTERPRET_RUNTIME_ERROR;
     }
 
@@ -125,7 +140,45 @@ static Results run(VM* vm) {
 
     COMPUTE_NEXT();
   
-  OP_ADD: BINARY_OPERATION(mpf_add); COMPUTE_NEXT();
+  OP_ADD: 
+    if (IS_NUMBER(peek(&vm->stack, 0)) && IS_NUMBER(peek(&vm->stack, 1))) {
+      Value right = pop(&vm->stack); 
+      Value left = pop(&vm->stack); 
+
+      mpf_t result; 
+      
+      mpf_init(result); 
+
+      mpf_add(result, left.content.number, right.content.number); 
+
+      push(&vm->stack, NUMBER(result)); 
+
+      COMPUTE_NEXT();
+    }
+
+    if (IS_STRING(peek(&vm->stack, 0)) && IS_STRING(peek(&vm->stack, 1))) {
+      String* right = AS_STRING(pop(&vm->stack));
+      String* left = AS_STRING(pop(&vm->stack));
+
+      int length = left->length + right->length;
+
+      char* content = ALLOCATE(char, length + 1);
+
+      memcpy(content, left->content, left->length);
+      memcpy(content + left->length, right->content, right->length);
+
+      content[length] = '\0';
+
+      String* result = allocate_string(content, length);
+
+      push(&vm->stack, OBJECT(result));
+
+      COMPUTE_NEXT();
+    }
+
+    runtime(vm, ip, "Operands must be two Numbers or two Strings.");
+
+    return INTERPRET_RUNTIME_ERROR;
 
   OP_SUBTRACT: BINARY_OPERATION(mpf_sub); COMPUTE_NEXT();
 
