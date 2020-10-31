@@ -53,6 +53,7 @@ int disassemble_instruction(Chunk* chunk, int offset) {
     case OP_SUBTRACT:
     case OP_MULTIPLY:
     case OP_DIVIDE:
+    case OP_POWER:
     case OP_NOT:
     case OP_EQUAL:
     case OP_GREATER:

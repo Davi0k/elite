@@ -228,6 +228,8 @@ Token scan(Tokenizer* tokenizer) {
     case '*': return make(tokenizer, TOKEN_ASTERISK);
     case '/': return make(tokenizer, TOKEN_SLASH);
 
+    case '^': return make(tokenizer, TOKEN_CARET);
+
     case '&': return make(tokenizer, TOKEN_AND);
     case '|': return make(tokenizer, TOKEN_OR);
 

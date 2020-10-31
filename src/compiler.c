@@ -42,6 +42,8 @@ Rule rules[] = {
   [ TOKEN_ASTERISK ] = { NULL, binary, PRECEDENCE_FACTOR },
   [ TOKEN_SLASH ] = { NULL, binary, PRECEDENCE_FACTOR },
 
+  [ TOKEN_CARET ] = { NULL, binary, PRECEDENCE_FACTOR },
+
   [ TOKEN_AND ] = { NULL, NULL, PRECEDENCE_NONE },
   [ TOKEN_OR ] = { NULL, NULL, PRECEDENCE_NONE },
   [ TOKEN_NOT ] = { unary, NULL, PRECEDENCE_NONE },
@@ -167,7 +169,7 @@ static void number(Parser* parser) {
 }
 
 static void string(Parser* parser) {
-  String* string = copy_string(parser->previous.start + 1, parser->previous.length - 2);
+  String* string = copy_string(parser->vm, parser->previous.start + 1, parser->previous.length - 2);
 
   Value value = OBJECT(string);
 
@@ -223,6 +225,8 @@ static void binary(Parser* parser) {
     case TOKEN_ASTERISK: emit(parser, OP_MULTIPLY); break;
     case TOKEN_SLASH: emit(parser, OP_DIVIDE); break;
 
+    case TOKEN_CARET: emit(parser, OP_POWER); break;
+
     case TOKEN_EQUAL: emit(parser, OP_EQUAL); break;
     case TOKEN_NOT_EQUAL: stream(parser, 2, OP_EQUAL, OP_NOT); break;
 
@@ -254,8 +258,10 @@ static void parse(Parser* parser, Precedences precedence) {
   }
 }
 
-bool compile(Chunk* chunk, const char* source) {
+bool compile(VM* vm, Chunk* chunk, const char* source) {
   Parser parser; 
+
+  parser.vm = vm;
 
   parser.compiling = chunk;
 

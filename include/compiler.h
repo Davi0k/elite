@@ -31,6 +31,8 @@ typedef struct {
   bool panic;
 
   Chunk* compiling;
+
+  VM* vm;
 } Parser;
 
 typedef struct {
@@ -39,6 +41,6 @@ typedef struct {
   Precedences precedence;
 } Rule;
 
-bool compile(Chunk* chunk, const char* source);
+bool compile(VM* vm, Chunk* chunk, const char* source);
 
 #endif

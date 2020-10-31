@@ -18,7 +18,7 @@ void initialize_VM(VM* vm) {
 }
 
 void free_VM(VM* vm) {
-
+  free_objects(vm);
 }
 
 void reset_stack(Stack* stack) {
@@ -94,7 +94,8 @@ static Results run(VM* vm) {
       if (IS_STRING(peek(&vm->stack, 0)) && IS_STRING(peek(&vm->stack, 1))) { \
         String* right = AS_STRING(pop(&vm->stack)); \
         String* left = AS_STRING(pop(&vm->stack)); \
-        bool comparison = left->length operator right->length && memcmp(left->content, right->content, left->length) operator 0; \
+        bool comparison = left->length operator right->length; \
+        if (left->length == right->length) comparison = memcmp(left->content, right->content, left->length) operator 0; \
         push(&vm->stack, BOOLEAN(comparison)); \
         COMPUTE_NEXT(); \
       } \
@@ -169,7 +170,7 @@ static Results run(VM* vm) {
 
       content[length] = '\0';
 
-      String* result = allocate_string(content, length);
+      String* result = allocate_string(vm, content, length);
 
       push(&vm->stack, OBJECT(result));
 
@@ -185,6 +186,27 @@ static Results run(VM* vm) {
   OP_MULTIPLY: BINARY_OPERATION(mpf_mul); COMPUTE_NEXT();
 
   OP_DIVIDE: BINARY_OPERATION(mpf_div); COMPUTE_NEXT();
+
+  OP_POWER: 
+    if (!IS_NUMBER(peek(&vm->stack, 0)) || !IS_NUMBER(peek(&vm->stack, 1))) { 
+      runtime(vm, ip, "Operands must be Numbers."); 
+      return INTERPRET_RUNTIME_ERROR; 
+    } 
+
+    Value right = pop(&vm->stack); 
+    Value left = pop(&vm->stack); 
+
+    mpf_t result; 
+      
+    mpf_init(result); 
+
+    unsigned long exponent = (unsigned long)(mpf_get_d(right.content.number));
+
+    mpf_pow_ui(result, left.content.number, exponent);
+
+    push(&vm->stack, NUMBER(result)); 
+
+    COMPUTE_NEXT();
 
   OP_NOT:
     do {
@@ -225,7 +247,7 @@ Results interpret(VM* vm, const char* source) {
 
   initialize_chunk(&chunk);
 
-  if(!compile(&chunk, source)) {
+  if(!compile(vm, &chunk, source)) {
     free_chunk(&chunk);
     return INTERPRET_COMPILE_ERROR;
   }
