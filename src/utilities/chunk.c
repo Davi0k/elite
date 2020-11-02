@@ -1,7 +1,7 @@
 #include <stdlib.h>
 
-#include "utils/chunk.h"
-#include "utils/memory.h"
+#include "utilities/chunk.h"
+#include "utilities/memory.h"
 
 void initialize_chunk(Chunk* chunk) {
   initialize_constants(&chunk->constants);

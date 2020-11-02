@@ -3,7 +3,7 @@
 
 #include "common.h"
 #include "vm.h"
-#include "utils/object.h"
+#include "types/object.h"
 
 #define MINIMUM 8
 #define MULTIPLICATOR 2
@@ -24,6 +24,8 @@
 
 void* reallocate(void* pointer, size_t oldest, size_t newest);
 
-void free_objects(VM* vm);
+void free_object(Object* object);
+
+void free_vm_objects(VM* vm);
 
 #endif

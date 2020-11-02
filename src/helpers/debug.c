@@ -1,8 +1,8 @@
 #include <stdio.h>
 
 #include "helpers/debug.h"
-#include "utils/chunk.h"
-#include "utils/value.h"
+#include "utilities/chunk.h"
+#include "types/value.h"
 #include "tokenizer.h"
 
 static int simple_representation(const char* name, int offset) {

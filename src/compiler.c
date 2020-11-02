@@ -8,7 +8,7 @@
 #include "tokenizer.h"
 #include "vm.h"
 
-#include "utils/object.h"
+#include "types/object.h"
 
 static void espression(Parser* parser);
 static void parse(Parser* parser, Precedences precedence);

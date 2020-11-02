@@ -4,15 +4,18 @@
 #include "common.h"
 
 typedef struct Object Object;
+typedef struct String String;
 
 #define BOOLEAN(value) ( (Value){ VALUE_BOOLEAN, { .boolean = value } } )
 #define OBJECT(value) ( (Value){ VALUE_OBJECT, { .object = (Object*)value } } )
-#define VOID ( (Value){ VALUE_VOID, { .number = 0 } } )
+#define VOID ( (Value){ VALUE_VOID } )
+#define UNDEFINED ( (Value){ VALUE_UNDEFINED } )
 
 #define IS_NUMBER(value) ( (value).type == VALUE_NUMBER )
 #define IS_BOOLEAN(value) ( (value).type == VALUE_BOOLEAN )
 #define IS_OBJECT(value) ( (value).type == VALUE_OBJECT )
 #define IS_VOID(value) ( (value).type == VALUE_VOID )
+#define IS_UNDEFINED(value) ( (value).type == VALUE_UNDEFINED )
 
 #define AS_NUMBER(value) ( (value).content.number )
 #define AS_BOOLEAN(value) ( (value).content.boolean )
@@ -22,7 +25,8 @@ typedef enum {
   VALUE_NUMBER,
   VALUE_BOOLEAN,
   VALUE_OBJECT,
-  VALUE_VOID
+  VALUE_VOID,
+  VALUE_UNDEFINED
 } Values;
 
 typedef struct {

@@ -3,7 +3,7 @@
 
 #include "common.h"
 #include "vm.h"
-#include "utils/value.h"
+#include "types/value.h"
 
 #define OBJECT_TYPE(value) ( AS_OBJECT(value)->type )
 
@@ -24,11 +24,13 @@ typedef struct String {
   Object Object;
   int length;
   char* content;
+  uint32_t hash;
 } String;
 
-String* allocate_string(VM* vm, char* content, int length);
+String* allocate_string(VM* vm, const char* content, int length, uint32_t hash);
 
 String* copy_string(VM* vm, const char* content, int length);
+String* take_string(VM* vm, const char* content, int length);
 
 void print_object(Value value);
 

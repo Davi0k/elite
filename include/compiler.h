@@ -3,7 +3,7 @@
 
 #include "vm.h"
 #include "tokenizer.h"
-#include "utils/chunk.h"
+#include "utilities/chunk.h"
 
 typedef void (*Function)();
 

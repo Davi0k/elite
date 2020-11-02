@@ -1,8 +1,9 @@
 #ifndef VM_H
 #define VM_H
 
-#include "utils/chunk.h"
-#include "utils/value.h"
+#include "utilities/chunk.h"
+#include "types/value.h"
+#include "utilities/table.h"
 
 #define STACK_MAX 256
 
@@ -27,6 +28,8 @@ typedef struct {
   Stack stack;
 
   Object* objects;
+
+  Table table;
 } VM;
 
 void initialize_VM(VM* vm);

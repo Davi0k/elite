@@ -2,7 +2,7 @@
 #define CHUNK_H
 
 #include "common.h"
-#include "utils/value.h"
+#include "types/value.h"
 
 #define FOREACH(OPERATION) \
   OPERATION(OP_CONSTANT) \

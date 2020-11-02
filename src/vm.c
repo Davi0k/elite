@@ -6,8 +6,8 @@
 #include "compiler.h"
 #include "vm.h"
 
-#include "utils/memory.h"
-#include "utils/object.h"
+#include "utilities/memory.h"
+#include "types/object.h"
 
 #include "helpers/debug.h"
 
@@ -15,10 +15,14 @@ void initialize_VM(VM* vm) {
   reset_stack(&vm->stack);
 
   vm->objects = NULL;
+
+  initialize_table(&vm->table);
 }
 
 void free_VM(VM* vm) {
-  free_objects(vm);
+  free_vm_objects(vm);
+
+  free_table(&vm->table); 
 }
 
 void reset_stack(Stack* stack) {
@@ -170,7 +174,7 @@ static Results run(VM* vm) {
 
       content[length] = '\0';
 
-      String* result = allocate_string(vm, content, length);
+      String* result = take_string(vm, content, length);
 
       push(&vm->stack, OBJECT(result));
 
