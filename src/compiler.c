@@ -10,6 +10,12 @@
 
 #include "types/object.h"
 
+void set_compiler(Parser* parser, Compiler* compiler) {
+  compiler->count = 0;
+  compiler->scope = 0;
+  parser->compiler = compiler;
+}
+
 static void espression(Parser* parser);
 static void parse(Parser* parser, Precedences precedence);
 
@@ -325,26 +331,49 @@ static void set(Parser* parser) {
   } while(match(parser, TOKEN_COMMA));
 }
 
-static void print(Parser* parser) {
-  expression(parser);
-  emit(parser, OP_PRINT);
+static void begin(Parser* parser) {
+  parser->compiler->scope++;
+}
+
+static void end(Parser* parser) {
+  parser->compiler->scope--;
+}
+
+static void block(Parser* parser) {
+  while (check(parser, TOKEN_CLOSE_BRACES) == false && check(parser, TOKEN_EOF) == false) {
+    while (match(parser, TOKEN_LINE)) continue;
+
+    declaration(parser);
+
+    if (match(parser, TOKEN_EOF)) break;
+
+    if (match(parser, TOKEN_SEMICOLON) == false)
+      consume(parser, TOKEN_LINE, "Expect End of Line character after value.");
+  }
+
+  consume(parser, TOKEN_CLOSE_BRACES, "Expect '}' after block.");
 }
 
 static void statement(Parser* parser) {
-  if (check(parser, TOKEN_SEMICOLON) || check(parser, TOKEN_LINE)) return;
+  if (check(parser, TOKEN_SEMICOLON)) return;
 
-  if (match(parser, TOKEN_PRINT))
-    return print(parser);
-
-  if (match(parser, TOKEN_EMPTY))
-    return emit(parser, OP_EMPTY);
-
-  if (match(parser, TOKEN_EXIT))
-    return emit(parser, OP_EXIT);
-
-  expression(parser);
-  
-  emit(parser, OP_POP);
+  if (match(parser, TOKEN_OPEN_BRACES)) {
+    begin(parser);
+    block(parser);
+    end(parser);
+  } 
+  else if (match(parser, TOKEN_PRINT)) {
+    expression(parser);
+    emit(parser, OP_PRINT);
+  }
+  else if (match(parser, TOKEN_EMPTY))
+    emit(parser, OP_EMPTY);
+  else if (match(parser, TOKEN_EXIT))
+    emit(parser, OP_EXIT);
+  else {
+    expression(parser);
+    emit(parser, OP_POP);
+  }
 }
 
 static void declaration(Parser* parser) {
@@ -389,11 +418,17 @@ bool compile(VM* vm, Chunk* chunk, const char* source) {
 
   set_tokenizer(&parser.tokenizer, source);
 
+  Compiler compiler;
+
+  set_compiler(&parser, &compiler);
+
   parser.error = false; parser.panic = false;
 
   advance(&parser);
   
   while (match(&parser, TOKEN_EOF) == false) {
+    while (match(&parser, TOKEN_LINE)) continue;
+
     declaration(&parser);
 
     if (match(&parser, TOKEN_EOF)) break;

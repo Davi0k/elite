@@ -20,6 +20,17 @@ typedef enum {
 } Precedences;
 
 typedef struct {
+  Token token;
+  int depth;
+} Local;
+
+typedef struct {
+  Local locals[UINT8_MAX + 1];
+  int count;
+  int scope;
+} Compiler;
+
+typedef struct {
   Tokenizer tokenizer;
 
   Token current;
@@ -29,6 +40,8 @@ typedef struct {
   bool panic;
 
   Chunk* compiling;
+
+  Compiler* compiler;
 
   VM* vm;
 } Parser;
@@ -40,6 +53,8 @@ typedef struct {
   Function infix;
   Precedences precedence;
 } Rule;
+
+void set_compiler(Parser* parser, Compiler* compiler);
 
 bool compile(VM* vm, Chunk* chunk, const char* source);
 
