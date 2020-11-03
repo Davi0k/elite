@@ -16,13 +16,15 @@ void initialize_VM(VM* vm) {
 
   vm->objects = NULL;
 
-  initialize_table(&vm->table);
+  initialize_table(&vm->strings);
+  initialize_table(&vm->globals);
 }
 
 void free_VM(VM* vm) {
   free_vm_objects(vm);
 
-  free_table(&vm->table); 
+  free_table(&vm->strings); 
+  free_table(&vm->globals); 
 }
 
 void reset_stack(Stack* stack) {
@@ -72,6 +74,8 @@ static Results run(VM* vm) {
   #define READ_CONSTANT() ( vm->chunk->constants.values[READ_BYTE()] )
 
   #define COMPUTE_NEXT() goto *jump_table[READ_BYTE()]
+
+  #define READ_STRING() AS_STRING(READ_CONSTANT())
 
   #define BINARY_OPERATION(operator) \
     do { \
@@ -127,6 +131,8 @@ static Results run(VM* vm) {
   OP_FALSE: push(&vm->stack, BOOLEAN(false)); COMPUTE_NEXT();
 
   OP_VOID: push(&vm->stack, VOID); COMPUTE_NEXT();
+
+  OP_UNDEFINED: push(&vm->stack, UNDEFINED); COMPUTE_NEXT();
 
   OP_NEGATION:
     if (!IS_NUMBER(peek(&vm->stack, 0))) {
@@ -235,13 +241,61 @@ static Results run(VM* vm) {
 
   OP_LESS: BINARY_COMPARISON(<); COMPUTE_NEXT();
 
-  OP_EXIT: 
-    print_stack(&vm->stack);
-    return INTERPRET_OK;
+  OP_PRINT:
+    print_value(pop(&vm->stack));
+    printf("\n");
+    COMPUTE_NEXT();
+
+  OP_GLOBAL_SET:
+    do {
+      String* identifier = READ_STRING();
+      table_set(&vm->globals, identifier, peek(&vm->stack, 0));
+      pop(&vm->stack);
+
+      COMPUTE_NEXT();
+    } while(false);
+
+  OP_GLOBAL_GET:
+    do {
+      String* identifier = READ_STRING();
+
+      Value value;
+
+      if (table_get(&vm->globals, identifier, &value) == false) {
+        runtime(vm, ip, "Undefined variable '%s'.", identifier->content);
+        return INTERPRET_RUNTIME_ERROR;
+      }
+
+      push(&vm->stack, value);
+
+      COMPUTE_NEXT();
+    } while(false);
+
+  OP_GLOBAL_ASSIGN:
+    do {
+      String* identifier = READ_STRING();
+
+      if (table_set(&vm->globals, identifier, peek(&vm->stack, 0))) {
+        table_delete(&vm->globals, identifier);
+        runtime(vm, ip, "Undefined variable '%s'.", identifier->content);
+        return INTERPRET_RUNTIME_ERROR;
+      }
+
+      COMPUTE_NEXT();
+    } while(false);
+
+  OP_POP: 
+    pop(&vm->stack); 
+    COMPUTE_NEXT();
+
+  OP_EMPTY: COMPUTE_NEXT();
+
+  OP_EXIT: return INTERPRET_OK;
 
   #undef READ_BYTE
   #undef READ_CONSTANT
   #undef COMPUTE_NEXT
+  #undef READ_STRING
   #undef BINARY_OPERATION
   #undef BINARY_COMPARISON
 }

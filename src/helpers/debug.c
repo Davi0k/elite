@@ -43,6 +43,9 @@ int disassemble_instruction(Chunk* chunk, int offset) {
 
   switch (instruction) {
     case OP_CONSTANT:
+    case OP_GLOBAL_SET:
+    case OP_GLOBAL_GET:
+    case OP_GLOBAL_ASSIGN:
       return constant_representation(strings[instruction], chunk, offset);
 
     case OP_TRUE:
@@ -58,6 +61,8 @@ int disassemble_instruction(Chunk* chunk, int offset) {
     case OP_EQUAL:
     case OP_GREATER:
     case OP_LESS:
+    case OP_PRINT:
+    case OP_POP:
     case OP_EXIT:
       return simple_representation(strings[instruction], offset);
 

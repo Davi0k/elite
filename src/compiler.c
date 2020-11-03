@@ -13,13 +13,18 @@
 static void espression(Parser* parser);
 static void parse(Parser* parser, Precedences precedence);
 
-static void grouping(Parser* parser);
-static void unary(Parser* parser);
-static void binary(Parser* parser);
+static void grouping(Parser* parser, bool assign);
+static void unary(Parser* parser, bool assign);
+static void binary(Parser* parser, bool assign);
 
-static void number(Parser* parser);
-static void string(Parser* parser);
-static void literal(Parser* parser);
+static void number(Parser* parser, bool assign);
+static void string(Parser* parser, bool assign);
+static void literal(Parser* parser, bool assign);
+
+static void variable(Parser* parser, bool assign);
+
+static void statement(Parser* parser);
+static void declaration(Parser* parser);
 
 Rule rules[] = { 
   [ TOKEN_EOF ] = { NULL, NULL, PRECEDENCE_NONE },
@@ -29,10 +34,11 @@ Rule rules[] = {
   [ TOKEN_EMPTY ] = { NULL, NULL, PRECEDENCE_NONE },
   [ TOKEN_EXIT ] = { NULL, NULL, PRECEDENCE_NONE },
 
-  [ TOKEN_IDENTIFIER ] = { NULL, NULL, PRECEDENCE_NONE },
+  [ TOKEN_IDENTIFIER ] = { variable, NULL, PRECEDENCE_NONE },
   [ TOKEN_NUMBER ] = { number, NULL, PRECEDENCE_NONE },
   [ TOKEN_STRING ] = { string, NULL, PRECEDENCE_NONE },
   [ TOKEN_VOID ] = { literal, NULL, PRECEDENCE_NONE },
+  [ TOKEN_UNDEFINED ] = { literal, NULL, PRECEDENCE_NONE },
 
   [ TOKEN_TRUE ] = { literal, NULL, PRECEDENCE_NONE },
   [ TOKEN_FALSE ] = { literal, NULL, PRECEDENCE_NONE },
@@ -75,14 +81,17 @@ Rule rules[] = {
   [ TOKEN_SET ] = { NULL, NULL, PRECEDENCE_NONE },
   [ TOKEN_GET ] = { NULL, NULL, PRECEDENCE_NONE },
   [ TOKEN_PRINT ] = { NULL, NULL, PRECEDENCE_NONE },
+  
   [ TOKEN_IF ] = { NULL, NULL, PRECEDENCE_NONE },
   [ TOKEN_ELSE ] = { NULL, NULL, PRECEDENCE_NONE },
   [ TOKEN_WHILE ] = { NULL, NULL, PRECEDENCE_NONE },
   [ TOKEN_FOR ] = { NULL, NULL, PRECEDENCE_NONE },
-  [ TOKEN_DEFINE ] = { NULL, NULL, PRECEDENCE_NONE },
 
+  [ TOKEN_DEFINE ] = { NULL, NULL, PRECEDENCE_NONE },
   [ TOKEN_RETURN ] = { NULL, NULL, PRECEDENCE_NONE },
-  [ TOKEN_SEMICOLON ] = { NULL, NULL, PRECEDENCE_NONE}
+
+  [ TOKEN_SEMICOLON ] = { NULL, NULL, PRECEDENCE_NONE},
+  [ TOKEN_LINE ] = { NULL, NULL, PRECEDENCE_NONE}
 };
 
 static void error(Parser* parser, Token token, const char* message) {
@@ -97,6 +106,10 @@ static void error(Parser* parser, Token token, const char* message) {
   fprintf(stderr, ": %s\n", message);
 
   parser->error = true;
+}
+
+static bool check(Parser* parser, Types type) {
+  return parser->current.type == type;
 }
 
 static void advance(Parser* parser) {
@@ -115,6 +128,12 @@ static void consume(Parser* parser, Types type, const char* message) {
     return advance(parser);
 
   error(parser, parser->current, message);
+}
+
+static bool match(Parser* parser, Types type) {
+  if (check(parser, type) == false) return false;
+  advance(parser);
+  return true;
 }
 
 static void emit(Parser* parser, uint8_t byte) {
@@ -152,7 +171,7 @@ static void constant(Parser* parser, Value value) {
   emit(parser, constant);
 }
 
-static void number(Parser* parser) {
+static void number(Parser* parser, bool assign) {
   char string[parser->previous.length + 1];
 
   strncpy(string, parser->previous.start, parser->previous.length + 1);
@@ -168,7 +187,7 @@ static void number(Parser* parser) {
   constant(parser, value);
 }
 
-static void string(Parser* parser) {
+static void string(Parser* parser, bool assign) {
   String* string = copy_string(parser->vm, parser->previous.start + 1, parser->previous.length - 2);
 
   Value value = OBJECT(string);
@@ -176,12 +195,14 @@ static void string(Parser* parser) {
   constant(parser, value);
 }
 
-static void literal(Parser* parser) {
+static void literal(Parser* parser, bool assign) {
   switch (parser->previous.type) {
     case TOKEN_TRUE: emit(parser, OP_TRUE); break;
     case TOKEN_FALSE: emit(parser, OP_FALSE); break;
 
     case TOKEN_VOID: emit(parser, OP_VOID); break;
+
+    case TOKEN_UNDEFINED: emit(parser, OP_UNDEFINED); break;
 
     default: return;
   }
@@ -191,12 +212,12 @@ static void expression(Parser* parser) {
   parse(parser, PRECEDENCE_ASSIGNMENT);
 }
 
-static void grouping(Parser* parser) {
+static void grouping(Parser* parser, bool assign) {
   expression(parser);
   consume(parser, TOKEN_CLOSE_PARENTHESES, "Expect a close parentheses after expression.");
 }
 
-static void unary(Parser* parser) {
+static void unary(Parser* parser, bool assign) {
   Types operator = parser->previous.type;
 
   parse(parser, PRECEDENCE_UNARY);
@@ -210,7 +231,7 @@ static void unary(Parser* parser) {
   }
 }
 
-static void binary(Parser* parser) {
+static void binary(Parser* parser, bool assign) {
   Types operator = parser->previous.type;
 
   Rule* rule = &rules[operator];
@@ -239,6 +260,102 @@ static void binary(Parser* parser) {
   }
 }
 
+static void synchronize(Parser* parser) {
+  parser->panic = false;
+
+  while (parser->current.type != TOKEN_EOF) {
+    if (parser->previous.type == TOKEN_SEMICOLON || parser->previous.type == TOKEN_LINE) return;
+
+    switch (parser->current.type) {
+      case TOKEN_DEFINE:
+      case TOKEN_SET:
+      case TOKEN_FOR:
+      case TOKEN_IF:
+      case TOKEN_WHILE:
+      case TOKEN_PRINT:
+      case TOKEN_RETURN:
+        return;
+    }
+
+    advance(parser);
+  }
+}
+
+static uint8_t identifier(Parser* parser, Token* token) {
+  String* string = copy_string(parser->vm, token->start, token->length);
+  Value value = OBJECT(string);
+
+  return make(parser, value);
+}
+
+static void variable(Parser* parser, bool assign) {
+  uint8_t argument = identifier(parser, &parser->previous);
+
+  Operations operation;
+
+  if (assign && match(parser, TOKEN_ASSIGN)) {
+    expression(parser);
+    operation = OP_GLOBAL_ASSIGN;
+  }
+  else operation = OP_GLOBAL_GET;
+
+  emit(parser, operation);
+  emit(parser, argument);
+}
+
+static uint8_t definition(Parser* parser, const char* error) {
+  consume(parser, TOKEN_IDENTIFIER, error);
+  return identifier(parser, &parser->previous);
+}
+
+static void define(Parser* parser, uint8_t global) {
+  emit(parser, OP_GLOBAL_SET);
+  emit(parser, global);
+}
+
+static void set(Parser* parser) {
+  do {
+    uint8_t global = definition(parser, "Expect variable identifier.");
+
+    if (match(parser, TOKEN_COLON))
+      expression(parser);
+    else emit(parser, OP_UNDEFINED);
+
+    define(parser, global);
+  } while(match(parser, TOKEN_COMMA));
+}
+
+static void print(Parser* parser) {
+  expression(parser);
+  emit(parser, OP_PRINT);
+}
+
+static void statement(Parser* parser) {
+  if (check(parser, TOKEN_SEMICOLON) || check(parser, TOKEN_LINE)) return;
+
+  if (match(parser, TOKEN_PRINT))
+    return print(parser);
+
+  if (match(parser, TOKEN_EMPTY))
+    return emit(parser, OP_EMPTY);
+
+  if (match(parser, TOKEN_EXIT))
+    return emit(parser, OP_EXIT);
+
+  expression(parser);
+  
+  emit(parser, OP_POP);
+}
+
+static void declaration(Parser* parser) {
+  if (match(parser, TOKEN_SET))
+    set(parser);
+  else statement(parser);
+
+  if (parser->panic) 
+    synchronize(parser);
+}
+
 static void parse(Parser* parser, Precedences precedence) {
   advance(parser);
 
@@ -249,13 +366,18 @@ static void parse(Parser* parser, Precedences precedence) {
     return;
   }
 
-  prefix(parser);
+  bool assign = precedence <= PRECEDENCE_ASSIGNMENT;
+
+  prefix(parser, assign);
 
   while (precedence <= rules[parser->current.type].precedence) {
     advance(parser);
     Function infix = rules[parser->previous.type].infix;
-    infix(parser);
+    infix(parser, assign);
   }
+
+  if (assign && match(parser, TOKEN_EQUAL))
+    error(parser, parser->previous, "Invalid assignment Target.");
 }
 
 bool compile(VM* vm, Chunk* chunk, const char* source) {
@@ -271,9 +393,14 @@ bool compile(VM* vm, Chunk* chunk, const char* source) {
 
   advance(&parser);
   
-  expression(&parser);
+  while (match(&parser, TOKEN_EOF) == false) {
+    declaration(&parser);
 
-  consume(&parser, TOKEN_EOF, "Expect end of expression.");
+    if (match(&parser, TOKEN_EOF)) break;
+
+    if (match(&parser, TOKEN_SEMICOLON) == false)
+      consume(&parser, TOKEN_LINE, "Expect End of Line character after value.");
+  }
 
   emit(&parser, OP_EXIT);
 

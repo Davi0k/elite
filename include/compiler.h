@@ -5,8 +5,6 @@
 #include "tokenizer.h"
 #include "utilities/chunk.h"
 
-typedef void (*Function)();
-
 typedef enum {
   PRECEDENCE_NONE,
   PRECEDENCE_ASSIGNMENT,
@@ -34,6 +32,8 @@ typedef struct {
 
   VM* vm;
 } Parser;
+
+typedef void (*Function)(Parser* parser, bool assign);
 
 typedef struct {
   Function prefix;

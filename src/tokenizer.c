@@ -61,11 +61,6 @@ static void skip_whitespace(Tokenizer* tokenizer) {
         advance(tokenizer);
         break;
 
-      case '\n':
-        tokenizer->line++;
-        advance(tokenizer);
-        break;
-
       case '#':
         while (*tokenizer->current != '\n' && *tokenizer->current != NULL_TERMINATOR) 
           advance(tokenizer);
@@ -153,6 +148,7 @@ static Types trie(Tokenizer* tokenizer) {
     case 'r': return keyword(tokenizer, 1, 5, "eturn", TOKEN_RETURN);
     case 's': return keyword(tokenizer, 1, 2, "et", TOKEN_SET);
     case 't': return keyword(tokenizer, 1, 3, "rue", TOKEN_TRUE);
+    case 'u': return keyword(tokenizer, 1, 8, "ndefined", TOKEN_UNDEFINED);
     case 'v': return keyword(tokenizer, 1, 3, "oid", TOKEN_VOID);
     case 'w': return keyword(tokenizer, 1, 4, "hile", TOKEN_WHILE);
   }
@@ -239,6 +235,10 @@ Token scan(Tokenizer* tokenizer) {
     case '>': return make(tokenizer, match(tokenizer, '=') ? TOKEN_GREATER_EQUAL : TOKEN_GREATER);
 
     case '=': return make(tokenizer, match(tokenizer, '=') ? TOKEN_EQUAL : TOKEN_ASSIGN);
+
+    case '\n': 
+      tokenizer->line++;
+      return make(tokenizer, TOKEN_LINE);
 
     case '\'':
     case '"':

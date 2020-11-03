@@ -28,7 +28,7 @@ String* allocate_string(VM* vm, const char* content, int length, uint32_t hash) 
 
   string->hash = hash;
 
-  table_set(&vm->table, string, UNDEFINED);
+  table_set(&vm->strings, string, UNDEFINED);
 
   return string;
 }
@@ -36,7 +36,7 @@ String* allocate_string(VM* vm, const char* content, int length, uint32_t hash) 
 String* copy_string(VM* vm, const char* content, int length) {
   uint32_t hash = hashing(content, length);
 
-  String* intern = table_find_string(&vm->table, content, length, hash);
+  String* intern = table_find_string(&vm->strings, content, length, hash);
 
   if (intern != NULL) return intern;
 
@@ -50,7 +50,7 @@ String* copy_string(VM* vm, const char* content, int length) {
 String* take_string(VM* vm, const char* content, int length) {
   uint32_t hash = hashing(content, length);
 
-  String* intern = table_find_string(&vm->table, content, length, hash);
+  String* intern = table_find_string(&vm->strings, content, length, hash);
 
   if (intern != NULL) {
     FREE_ARRAY(char, (char*)content, length + 1);

@@ -29,7 +29,8 @@ typedef struct {
 
   Object* objects;
 
-  Table table;
+  Table strings;
+  Table globals;
 } VM;
 
 void initialize_VM(VM* vm);
