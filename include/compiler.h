@@ -5,6 +5,10 @@
 #include "tokenizer.h"
 #include "utilities/chunk.h"
 
+#define UINT8_COUNT UINT8_MAX + 1
+
+#define INITIALIZED -1
+
 typedef enum {
   PRECEDENCE_NONE,
   PRECEDENCE_ASSIGNMENT,
@@ -20,12 +24,12 @@ typedef enum {
 } Precedences;
 
 typedef struct {
-  Token token;
+  Token identifier;
   int depth;
 } Local;
 
 typedef struct {
-  Local locals[UINT8_MAX + 1];
+  Local locals[UINT8_COUNT];
   int count;
   int scope;
 } Compiler;

@@ -29,8 +29,8 @@ static void literal(Parser* parser, bool assign);
 
 static void variable(Parser* parser, bool assign);
 
+static void instruction(Parser* parser);
 static void statement(Parser* parser);
-static void declaration(Parser* parser);
 
 Rule rules[] = { 
   [ TOKEN_EOF ] = { NULL, NULL, PRECEDENCE_NONE },
@@ -287,6 +287,11 @@ static void synchronize(Parser* parser) {
   }
 }
 
+static bool identifiers_equality(Token* left, Token* right) {
+  if (left->length != right->length) return false;
+  return memcmp(left->start, right->start, left->length) == 0;
+}
+
 static uint8_t identifier(Parser* parser, Token* token) {
   String* string = copy_string(parser->vm, token->start, token->length);
   Value value = OBJECT(string);
@@ -294,29 +299,92 @@ static uint8_t identifier(Parser* parser, Token* token) {
   return make(parser, value);
 }
 
-static void variable(Parser* parser, bool assign) {
-  uint8_t argument = identifier(parser, &parser->previous);
+static void local(Parser* parser, Token identifier) {
+  if (parser->compiler->count == UINT8_COUNT) {
+    error(parser, parser->previous, "Too many local variables in function.");
+    return;
+  }
 
-  Operations operation;
+  Local* local = &parser->compiler->locals[parser->compiler->count++];
+  local->identifier = identifier;
+  local->depth = INITIALIZED;
+}
+
+static int resolve(Parser* parser, Token* identifier) {
+  for (int i = parser->compiler->count - 1; i >= 0; i--) {
+    Local* local = &parser->compiler->locals[i];
+    
+    if (identifiers_equality(identifier, &local->identifier)) {
+      if (local->depth == INITIALIZED)
+        error(parser, parser->previous, "Can't read local variable in its own initializer.");
+
+      return i;
+    }
+  }
+
+  return INITIALIZED;
+}
+
+static void variable(Parser* parser, bool assign) {
+  uint8_t GET, ASSIGN;
+
+  int argument = resolve(parser, &parser->previous);
+
+  if (argument >= 0) {
+    GET = OP_LOCAL_GET;
+    ASSIGN = OP_LOCAL_SET;
+  } else {
+    argument = identifier(parser, &parser->previous);
+
+    GET = OP_GLOBAL_GET;
+    ASSIGN = OP_GLOBAL_SET;
+  }
+
+  uint8_t operation;
 
   if (assign && match(parser, TOKEN_ASSIGN)) {
     expression(parser);
-    operation = OP_GLOBAL_ASSIGN;
+    operation = ASSIGN;
   }
-  else operation = OP_GLOBAL_GET;
+  else operation = GET;
 
   emit(parser, operation);
   emit(parser, argument);
 }
 
+static void declaration(Parser* parser) {
+  if (parser->compiler->scope == 0) return;
+
+  Token* identifier = &parser->previous;
+
+  for (int i = parser->compiler->count - 1; i >= 0; i--) {
+    Local* local = &parser->compiler->locals[i];
+
+    if (local->depth != INITIALIZED && local->depth < parser->compiler->scope) break;
+
+    if (identifiers_equality(identifier, &local->identifier))
+      error(parser, parser->previous, "Already variable with this name in this scope.");
+  }
+
+  local(parser, *identifier);
+}
+
 static uint8_t definition(Parser* parser, const char* error) {
   consume(parser, TOKEN_IDENTIFIER, error);
+
+  declaration(parser);
+
+  if (parser->compiler->scope > 0) return 0;
+
   return identifier(parser, &parser->previous);
 }
 
 static void define(Parser* parser, uint8_t global) {
-  emit(parser, OP_GLOBAL_SET);
-  emit(parser, global);
+  if (parser->compiler->scope == 0) {
+    emit(parser, OP_GLOBAL_INITIALIZE);
+    emit(parser, global);
+  }
+  else parser->compiler->locals[parser->compiler->count - 1].depth = parser->compiler->scope;
 }
 
 static void set(Parser* parser) {
@@ -337,13 +405,25 @@ static void begin(Parser* parser) {
 
 static void end(Parser* parser) {
   parser->compiler->scope--;
+
+  Compiler* compiler = parser->compiler;
+
+  int count = compiler->count;
+
+  while (count > 0 && compiler->locals[count - 1].depth > compiler->scope)
+    count--;
+
+  emit(parser, OP_POP_N);
+  emit(parser, compiler->count - count);
+
+  compiler->count = count;
 }
 
 static void block(Parser* parser) {
   while (check(parser, TOKEN_CLOSE_BRACES) == false && check(parser, TOKEN_EOF) == false) {
     while (match(parser, TOKEN_LINE)) continue;
 
-    declaration(parser);
+    instruction(parser);
 
     if (match(parser, TOKEN_EOF)) break;
 
@@ -376,7 +456,7 @@ static void statement(Parser* parser) {
   }
 }
 
-static void declaration(Parser* parser) {
+static void instruction(Parser* parser) {
   if (match(parser, TOKEN_SET))
     set(parser);
   else statement(parser);
@@ -429,7 +509,7 @@ bool compile(VM* vm, Chunk* chunk, const char* source) {
   while (match(&parser, TOKEN_EOF) == false) {
     while (match(&parser, TOKEN_LINE)) continue;
 
-    declaration(&parser);
+    instruction(&parser);
 
     if (match(&parser, TOKEN_EOF)) break;
 

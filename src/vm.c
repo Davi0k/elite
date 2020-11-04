@@ -36,8 +36,8 @@ void push(Stack* stack, Value value) {
   stack->top++;
 }
 
-Value pop(Stack* stack) {
-  stack->top--;
+Value pop(Stack* stack, int distance) {
+  stack->top = stack->top - distance;
 
   return *stack->top;
 }
@@ -83,8 +83,8 @@ static Results run(VM* vm) {
         runtime(vm, ip, "Operands must be Numbers."); \
         return INTERPRET_RUNTIME_ERROR; \
       } \
-      Value right = pop(&vm->stack); \
-      Value left = pop(&vm->stack); \
+      Value right = pop(&vm->stack, 1); \
+      Value left = pop(&vm->stack, 1); \
       mpf_t result; mpf_init(result); \
       operator(result, left.content.number, right.content.number); \
       push(&vm->stack, NUMBER(result)); \
@@ -93,15 +93,15 @@ static Results run(VM* vm) {
   #define BINARY_COMPARISON(operator) \
     do { \
       if (IS_NUMBER(peek(&vm->stack, 0)) && IS_NUMBER(peek(&vm->stack, 1))) { \
-        Value right = pop(&vm->stack); \
-        Value left = pop(&vm->stack); \
+        Value right = pop(&vm->stack, 1); \
+        Value left = pop(&vm->stack, 1); \
         bool comparison = mpf_cmp(AS_NUMBER(left), AS_NUMBER(right)) operator 0; \
         push(&vm->stack, BOOLEAN(comparison)); \
         COMPUTE_NEXT(); \
       } \
       if (IS_STRING(peek(&vm->stack, 0)) && IS_STRING(peek(&vm->stack, 1))) { \
-        String* right = AS_STRING(pop(&vm->stack)); \
-        String* left = AS_STRING(pop(&vm->stack)); \
+        String* right = AS_STRING(pop(&vm->stack, 1)); \
+        String* left = AS_STRING(pop(&vm->stack, 1)); \
         bool comparison = left->length operator right->length; \
         if (left->length == right->length) comparison = memcmp(left->content, right->content, left->length) operator 0; \
         push(&vm->stack, BOOLEAN(comparison)); \
@@ -145,7 +145,7 @@ static Results run(VM* vm) {
     
     mpf_init(number);
 
-    mpf_neg(number, AS_NUMBER(pop(&vm->stack)));
+    mpf_neg(number, AS_NUMBER(pop(&vm->stack, 1)));
 
     push(&vm->stack, NUMBER(number));
 
@@ -153,8 +153,8 @@ static Results run(VM* vm) {
   
   OP_ADD: 
     if (IS_NUMBER(peek(&vm->stack, 0)) && IS_NUMBER(peek(&vm->stack, 1))) {
-      Value right = pop(&vm->stack); 
-      Value left = pop(&vm->stack); 
+      Value right = pop(&vm->stack, 1); 
+      Value left = pop(&vm->stack, 1); 
 
       mpf_t result; 
       
@@ -168,8 +168,8 @@ static Results run(VM* vm) {
     }
 
     if (IS_STRING(peek(&vm->stack, 0)) && IS_STRING(peek(&vm->stack, 1))) {
-      String* right = AS_STRING(pop(&vm->stack));
-      String* left = AS_STRING(pop(&vm->stack));
+      String* right = AS_STRING(pop(&vm->stack, 1));
+      String* left = AS_STRING(pop(&vm->stack, 1));
 
       int length = left->length + right->length;
 
@@ -203,8 +203,8 @@ static Results run(VM* vm) {
       return INTERPRET_RUNTIME_ERROR; 
     } 
 
-    Value right = pop(&vm->stack); 
-    Value left = pop(&vm->stack); 
+    Value right = pop(&vm->stack, 1); 
+    Value left = pop(&vm->stack, 1); 
 
     mpf_t result; 
       
@@ -220,15 +220,15 @@ static Results run(VM* vm) {
 
   OP_NOT:
     do {
-      bool result = falsey(pop(&vm->stack));
+      bool result = falsey(pop(&vm->stack, 1));
       push(&vm->stack, BOOLEAN(result));
       COMPUTE_NEXT();
     } while(false);
 
   OP_EQUAL:
     do {
-      Value right = pop(&vm->stack);
-      Value left = pop(&vm->stack);
+      Value right = pop(&vm->stack, 1);
+      Value left = pop(&vm->stack, 1);
 
       bool result = equal(left, right);
 
@@ -242,15 +242,28 @@ static Results run(VM* vm) {
   OP_LESS: BINARY_COMPARISON(<); COMPUTE_NEXT();
 
   OP_PRINT:
-    print_value(pop(&vm->stack));
+    print_value(pop(&vm->stack, 1));
     printf("\n");
     COMPUTE_NEXT();
+
+  OP_GLOBAL_INITIALIZE:
+    do {
+      String* identifier = READ_STRING();
+      table_set(&vm->globals, identifier, peek(&vm->stack, 0));
+      pop(&vm->stack, 1);
+
+      COMPUTE_NEXT();
+    } while(false);
 
   OP_GLOBAL_SET:
     do {
       String* identifier = READ_STRING();
-      table_set(&vm->globals, identifier, peek(&vm->stack, 0));
-      pop(&vm->stack);
+
+      if (table_set(&vm->globals, identifier, peek(&vm->stack, 0))) {
+        table_delete(&vm->globals, identifier);
+        runtime(vm, ip, "Undefined variable '%s'.", identifier->content);
+        return INTERPRET_RUNTIME_ERROR;
+      }
 
       COMPUTE_NEXT();
     } while(false);
@@ -271,22 +284,32 @@ static Results run(VM* vm) {
       COMPUTE_NEXT();
     } while(false);
 
-  OP_GLOBAL_ASSIGN:
+  OP_LOCAL_SET:
     do {
-      String* identifier = READ_STRING();
+      uint8_t slot = READ_BYTE();
+      vm->stack.content[slot] = peek(&vm->stack, 0);
+      COMPUTE_NEXT();
+    } while(false);
 
-      if (table_set(&vm->globals, identifier, peek(&vm->stack, 0))) {
-        table_delete(&vm->globals, identifier);
-        runtime(vm, ip, "Undefined variable '%s'.", identifier->content);
-        return INTERPRET_RUNTIME_ERROR;
-      }
-
+  OP_LOCAL_GET:
+    do {
+      uint8_t slot = READ_BYTE();
+      push(&vm->stack, vm->stack.content[slot]);
       COMPUTE_NEXT();
     } while(false);
 
   OP_POP: 
-    pop(&vm->stack); 
+    pop(&vm->stack, 1); 
     COMPUTE_NEXT();
+
+  OP_POP_N:
+    do {
+      uint8_t count = READ_BYTE();
+
+      pop(&vm->stack, count);
+
+      COMPUTE_NEXT();
+    } while(false);
 
   OP_EMPTY: COMPUTE_NEXT();
 

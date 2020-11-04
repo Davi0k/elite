@@ -21,6 +21,12 @@ static int constant_representation(const char* name, Chunk* chunk, int offset) {
   return offset + 2;
 }
 
+static int byte_representation(const char* name, Chunk* chunk, int offset) {
+  uint8_t slot = chunk->code[offset + 1];
+  printf("%-16s %4d\n", name, slot);
+  return offset + 2; 
+}
+
 void disassemble_chunk(Chunk* chunk, const char* name) {
   printf("< %s >", name); printf("\n");
 
@@ -42,10 +48,14 @@ int disassemble_instruction(Chunk* chunk, int offset) {
   uint8_t instruction = chunk->code[offset];
 
   switch (instruction) {
+    case OP_LOCAL_SET:
+    case OP_LOCAL_GET:
+      return byte_representation(strings[instruction], chunk, offset);
+
     case OP_CONSTANT:
+    case OP_GLOBAL_INITIALIZE:
     case OP_GLOBAL_SET:
     case OP_GLOBAL_GET:
-    case OP_GLOBAL_ASSIGN:
       return constant_representation(strings[instruction], chunk, offset);
 
     case OP_TRUE:

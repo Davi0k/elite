@@ -21,7 +21,7 @@ typedef struct {
 void reset_stack(Stack* stack);
 
 void push(Stack* stack, Value value);
-Value pop(Stack* stack);
+Value pop(Stack* stack, int distance);
 
 typedef struct {
   Chunk* chunk;
@@ -29,8 +29,7 @@ typedef struct {
 
   Object* objects;
 
-  Table strings;
-  Table globals;
+  Table strings, globals;
 } VM;
 
 void initialize_VM(VM* vm);
