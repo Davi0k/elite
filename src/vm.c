@@ -47,7 +47,7 @@ static Value peek(Stack* stack, int distance) {
 }
 
 static bool falsey(Value value) {
-  return IS_VOID(value) || (IS_BOOLEAN(value) && AS_BOOLEAN(value) == false);
+  return IS_VOID(value) || IS_UNDEFINED(value) || (IS_BOOLEAN(value) && AS_BOOLEAN(value) == false);
 }
 
 static void runtime(VM* vm, uint8_t* ip, const char* message, ...) {
@@ -71,11 +71,11 @@ static void runtime(VM* vm, uint8_t* ip, const char* message, ...) {
 static Results run(VM* vm) {
   #define READ_BYTE() ( *++ip )
 
+  #define READ_SHORT() ( ip += 2, (uint16_t)((ip[-1] << 8) | ip[0]) )
+
   #define READ_CONSTANT() ( vm->chunk->constants.values[READ_BYTE()] )
 
   #define COMPUTE_NEXT() goto *jump_table[READ_BYTE()]
-
-  #define READ_STRING() AS_STRING(READ_CONSTANT())
 
   #define BINARY_OPERATION(operator) \
     do { \
@@ -248,7 +248,7 @@ static Results run(VM* vm) {
 
   OP_GLOBAL_INITIALIZE:
     do {
-      String* identifier = READ_STRING();
+      String* identifier = AS_STRING(READ_CONSTANT());
       table_set(&vm->globals, identifier, peek(&vm->stack, 0));
       pop(&vm->stack, 1);
 
@@ -257,7 +257,7 @@ static Results run(VM* vm) {
 
   OP_GLOBAL_SET:
     do {
-      String* identifier = READ_STRING();
+      String* identifier = AS_STRING(READ_CONSTANT());
 
       if (table_set(&vm->globals, identifier, peek(&vm->stack, 0))) {
         table_delete(&vm->globals, identifier);
@@ -270,7 +270,7 @@ static Results run(VM* vm) {
 
   OP_GLOBAL_GET:
     do {
-      String* identifier = READ_STRING();
+      String* identifier = AS_STRING(READ_CONSTANT());
 
       Value value;
 
@@ -298,6 +298,35 @@ static Results run(VM* vm) {
       COMPUTE_NEXT();
     } while(false);
 
+  OP_LOOP:
+    do {
+      uint16_t offset = READ_SHORT();
+
+      ip -= offset;
+      
+      COMPUTE_NEXT();
+    } while(false);
+
+  OP_JUMP:
+    do {
+      uint16_t offset = READ_SHORT();
+
+      ip += offset;
+     
+      COMPUTE_NEXT();
+    } while(false);
+
+  OP_JUMP_CONDITIONAL:
+    do {
+      uint16_t offset = READ_SHORT();
+
+      Value value = peek(&vm->stack, 0);
+
+      ip += (falsey(value) ? 1 : 0) * offset;
+      
+      COMPUTE_NEXT();
+    } while(false);
+
   OP_POP: 
     pop(&vm->stack, 1); 
     COMPUTE_NEXT();
@@ -316,9 +345,9 @@ static Results run(VM* vm) {
   OP_EXIT: return INTERPRET_OK;
 
   #undef READ_BYTE
+  #undef READ_SHORT
   #undef READ_CONSTANT
   #undef COMPUTE_NEXT
-  #undef READ_STRING
   #undef BINARY_OPERATION
   #undef BINARY_COMPARISON
 }

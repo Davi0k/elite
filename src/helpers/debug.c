@@ -27,6 +27,13 @@ static int byte_representation(const char* name, Chunk* chunk, int offset) {
   return offset + 2; 
 }
 
+static int jump_representation(const char* name, int sign, Chunk* chunk, int offset) {
+  uint16_t jump = (uint16_t)(chunk->code[offset + 1] << 8);
+  jump |= chunk->code[offset + 2];
+  printf("%-16s %4d -> %d\n", name, offset, offset + 3 + sign * jump);
+  return offset + 3;
+}
+
 void disassemble_chunk(Chunk* chunk, const char* name) {
   printf("< %s >", name); printf("\n");
 
@@ -48,6 +55,11 @@ int disassemble_instruction(Chunk* chunk, int offset) {
   uint8_t instruction = chunk->code[offset];
 
   switch (instruction) {
+    case OP_LOOP:
+    case OP_JUMP:
+    case OP_JUMP_CONDITIONAL:
+      return jump_representation(strings[instruction], 1, chunk, offset);
+
     case OP_LOCAL_SET:
     case OP_LOCAL_GET:
       return byte_representation(strings[instruction], chunk, offset);

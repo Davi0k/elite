@@ -27,6 +27,9 @@ static void number(Parser* parser, bool assign);
 static void string(Parser* parser, bool assign);
 static void literal(Parser* parser, bool assign);
 
+static void and(Parser* parser, bool assign);
+static void or(Parser* parser, bool assign);
+
 static void variable(Parser* parser, bool assign);
 
 static void instruction(Parser* parser);
@@ -56,8 +59,8 @@ Rule rules[] = {
 
   [ TOKEN_CARET ] = { NULL, binary, PRECEDENCE_FACTOR },
 
-  [ TOKEN_AND ] = { NULL, NULL, PRECEDENCE_NONE },
-  [ TOKEN_OR ] = { NULL, NULL, PRECEDENCE_NONE },
+  [ TOKEN_AND ] = { NULL, and, PRECEDENCE_AND },
+  [ TOKEN_OR ] = { NULL, or, PRECEDENCE_OR },
   [ TOKEN_NOT ] = { unary, NULL, PRECEDENCE_NONE },
 
   [ TOKEN_EQUAL ] = { NULL, binary, PRECEDENCE_EQUALITY },
@@ -85,7 +88,7 @@ Rule rules[] = {
   [ TOKEN_DECREMENT ] = { NULL, NULL, PRECEDENCE_NONE },
 
   [ TOKEN_SET ] = { NULL, NULL, PRECEDENCE_NONE },
-  [ TOKEN_GET ] = { NULL, NULL, PRECEDENCE_NONE },
+
   [ TOKEN_PRINT ] = { NULL, NULL, PRECEDENCE_NONE },
   
   [ TOKEN_IF ] = { NULL, NULL, PRECEDENCE_NONE },
@@ -96,8 +99,7 @@ Rule rules[] = {
   [ TOKEN_DEFINE ] = { NULL, NULL, PRECEDENCE_NONE },
   [ TOKEN_RETURN ] = { NULL, NULL, PRECEDENCE_NONE },
 
-  [ TOKEN_SEMICOLON ] = { NULL, NULL, PRECEDENCE_NONE},
-  [ TOKEN_LINE ] = { NULL, NULL, PRECEDENCE_NONE}
+  [ TOKEN_SEMICOLON ] = { NULL, NULL, PRECEDENCE_NONE}
 };
 
 static void error(Parser* parser, Token token, const char* message) {
@@ -270,7 +272,7 @@ static void synchronize(Parser* parser) {
   parser->panic = false;
 
   while (parser->current.type != TOKEN_EOF) {
-    if (parser->previous.type == TOKEN_SEMICOLON || parser->previous.type == TOKEN_LINE) return;
+    if (parser->previous.type == TOKEN_SEMICOLON) return;
 
     switch (parser->current.type) {
       case TOKEN_DEFINE:
@@ -387,6 +389,61 @@ static void define(Parser* parser, uint8_t global) {
   else parser->compiler->locals[parser->compiler->count - 1].depth = parser->compiler->scope;
 }
 
+static int jump(Parser* parser, uint8_t instruction) {
+  emit(parser, instruction);
+
+  emit(parser, 0xff);
+  emit(parser, 0xff);
+
+  return parser->compiling->count - 2;
+}
+
+static void patch(Parser* parser, int offset) {
+  int jump = parser->compiling->count - offset - 2;
+
+  if (jump > UINT16_MAX)
+    error(parser, parser->previous, "Too much code to jump over.");
+
+  parser->compiling->code[offset] = (jump >> 8) & 0xff;
+  parser->compiling->code[offset + 1] = jump & 0xff;
+}
+
+static void loop(Parser* parser, int start) {
+  emit(parser, OP_LOOP);
+
+  int offset = parser->compiling->count - start + 2;
+
+  if (offset > UINT16_MAX) 
+    error(parser, parser->previous, "Loop body too large.");
+
+  emit(parser, (offset >> 8) & 0xff);
+  emit(parser, offset & 0xff);
+}
+
+static void and(Parser* parser, bool assign) {
+  int end = jump(parser, OP_JUMP_CONDITIONAL);
+
+  emit(parser, OP_POP);
+
+  parse(parser, PRECEDENCE_AND);
+
+  patch(parser, end);
+}
+
+static void or(Parser* parser, bool assign) {
+  int otherwise = jump(parser, OP_JUMP_CONDITIONAL);
+
+  int end = jump(parser, OP_JUMP);
+
+  patch(parser, otherwise);
+
+  emit(parser, OP_POP);
+
+  parse(parser, PRECEDENCE_OR);
+
+  patch(parser, end);
+}
+
 static void set(Parser* parser) {
   do {
     uint8_t global = definition(parser, "Expect variable identifier.");
@@ -397,6 +454,8 @@ static void set(Parser* parser) {
 
     define(parser, global);
   } while(match(parser, TOKEN_COMMA));
+
+  consume(parser, TOKEN_SEMICOLON, "Expect a ';' after instruction.");
 }
 
 static void begin(Parser* parser) {
@@ -420,22 +479,60 @@ static void end(Parser* parser) {
 }
 
 static void block(Parser* parser) {
-  while (check(parser, TOKEN_CLOSE_BRACES) == false && check(parser, TOKEN_EOF) == false) {
-    while (match(parser, TOKEN_LINE)) continue;
-
+  while (check(parser, TOKEN_CLOSE_BRACES) == false && check(parser, TOKEN_EOF) == false) 
     instruction(parser);
-
-    if (match(parser, TOKEN_EOF)) break;
-
-    if (match(parser, TOKEN_SEMICOLON) == false)
-      consume(parser, TOKEN_LINE, "Expect End of Line character after value.");
-  }
 
   consume(parser, TOKEN_CLOSE_BRACES, "Expect '}' after block.");
 }
 
+static void condition(Parser* parser) {
+  expression(parser);
+
+  consume(parser, TOKEN_COLON, "Expect ':' after condition.");
+
+  int then = jump(parser, OP_JUMP_CONDITIONAL);
+
+  emit(parser, OP_POP);
+
+  statement(parser);
+
+  int otherwise = jump(parser, OP_JUMP);
+
+  patch(parser, then);
+
+  emit(parser, OP_POP);
+
+  if (match(parser, TOKEN_ELSE)) {
+    consume(parser, TOKEN_COLON, "Expect ':' after else statement.");
+    
+    statement(parser);
+  }
+
+  patch(parser, otherwise);
+}
+
+static void repeat(Parser* parser) {
+  int start = parser->compiling->count;
+
+  expression(parser);
+
+  consume(parser, TOKEN_COLON, "Expect ':' after condition.");
+
+  int exit = jump(parser, OP_JUMP_CONDITIONAL);
+
+  emit(parser, OP_POP);
+
+  statement(parser);
+
+  loop(parser, start);
+
+  patch(parser, exit);
+
+  emit(parser, OP_POP);
+}
+
 static void statement(Parser* parser) {
-  if (check(parser, TOKEN_SEMICOLON)) return;
+  if (match(parser, TOKEN_SEMICOLON) == true) return;
 
   if (match(parser, TOKEN_OPEN_BRACES)) {
     begin(parser);
@@ -445,14 +542,24 @@ static void statement(Parser* parser) {
   else if (match(parser, TOKEN_PRINT)) {
     expression(parser);
     emit(parser, OP_PRINT);
-  }
-  else if (match(parser, TOKEN_EMPTY))
+    consume(parser, TOKEN_SEMICOLON, "Expect a ';' after instruction.");
+  } 
+  else if (match(parser, TOKEN_IF)) 
+    condition(parser);
+  else if (match(parser, TOKEN_WHILE))
+    repeat(parser);
+  else if (match(parser, TOKEN_EMPTY)) {
     emit(parser, OP_EMPTY);
-  else if (match(parser, TOKEN_EXIT))
+    consume(parser, TOKEN_SEMICOLON, "Expect a ';' after instruction.");
+  }
+  else if (match(parser, TOKEN_EXIT)) {
     emit(parser, OP_EXIT);
+    consume(parser, TOKEN_SEMICOLON, "Expect a ';' after instruction.");
+  }
   else {
     expression(parser);
     emit(parser, OP_POP);
+    consume(parser, TOKEN_SEMICOLON, "Expect a ';' after instruction.");
   }
 }
 
@@ -506,16 +613,8 @@ bool compile(VM* vm, Chunk* chunk, const char* source) {
 
   advance(&parser);
   
-  while (match(&parser, TOKEN_EOF) == false) {
-    while (match(&parser, TOKEN_LINE)) continue;
-
+  while (match(&parser, TOKEN_EOF) == false)
     instruction(&parser);
-
-    if (match(&parser, TOKEN_EOF)) break;
-
-    if (match(&parser, TOKEN_SEMICOLON) == false)
-      consume(&parser, TOKEN_LINE, "Expect End of Line character after value.");
-  }
 
   emit(&parser, OP_EXIT);
 

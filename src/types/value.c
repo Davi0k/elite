@@ -51,6 +51,8 @@ bool equal(Value left, Value right) {
 
     case VALUE_VOID: return true;
 
+    case VALUE_UNDEFINED: return true;
+
     default: return false;
   }
 }
