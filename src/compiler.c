@@ -349,6 +349,24 @@ static void variable(Parser* parser, bool assign) {
     expression(parser);
     operation = ASSIGN;
   }
+  else if (assign && match(parser, TOKEN_INCREMENT)) {
+    emit(parser, GET);
+    emit(parser, argument);
+
+    constant(parser, MPF_NEUTRAL);
+
+    emit(parser, OP_ADD);
+    operation = ASSIGN;
+  }
+  else if (assign && match(parser, TOKEN_DECREMENT)) {
+    emit(parser, GET);
+    emit(parser, argument);
+
+    constant(parser, MPF_NEUTRAL);
+
+    emit(parser, OP_SUBTRACT);
+    operation = ASSIGN;
+  }
   else operation = GET;
 
   emit(parser, operation);

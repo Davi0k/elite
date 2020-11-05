@@ -6,6 +6,8 @@
 typedef struct Object Object;
 typedef struct String String;
 
+#define MPF_NEUTRAL NUMBER_FROM_VALUE(1.0)
+
 #define BOOLEAN(value) ( (Value){ VALUE_BOOLEAN, { .boolean = value } } )
 #define OBJECT(value) ( (Value){ VALUE_OBJECT, { .object = (Object*)value } } )
 #define VOID ( (Value){ VALUE_VOID } )
@@ -46,6 +48,8 @@ typedef struct {
 } Constants;
 
 Value NUMBER(mpf_t number);
+
+Value NUMBER_FROM_VALUE(double number);
 
 void initialize_constants(Constants* constants);
 void free_constants(Constants* constants);

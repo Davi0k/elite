@@ -15,6 +15,16 @@ Value NUMBER(mpf_t number) {
   return value;
 }
 
+Value NUMBER_FROM_VALUE(double number) {
+  Value value;
+
+  value.type = VALUE_NUMBER;
+
+  mpf_init_set_d(value.content.number, number);
+
+  return value;
+}
+
 void initialize_constants(Constants* constants) {
   constants->values = NULL;
   constants->capacity = 0;
