@@ -57,7 +57,7 @@ int disassemble_instruction(Chunk* chunk, int offset) {
   switch (instruction) {
     case OP_LOOP:
     case OP_JUMP:
-    case OP_JUMP_CONDITIONAL:
+    case OP_CONDITIONAL:
       return jump_representation(strings[instruction], 1, chunk, offset);
 
     case OP_LOCAL_SET:
