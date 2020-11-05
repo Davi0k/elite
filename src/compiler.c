@@ -222,6 +222,7 @@ static void expression(Parser* parser) {
 
 static void grouping(Parser* parser, bool assign) {
   expression(parser);
+
   consume(parser, TOKEN_CLOSE_PARENTHESES, "Expect a close parentheses after expression.");
 }
 
@@ -421,7 +422,7 @@ static void loop(Parser* parser, int start) {
 }
 
 static void and(Parser* parser, bool assign) {
-  int end = jump(parser, OP_JUMP_CONDITIONAL);
+  int end = jump(parser, OP_CONDITIONAL);
 
   emit(parser, OP_POP);
 
@@ -431,7 +432,7 @@ static void and(Parser* parser, bool assign) {
 }
 
 static void or(Parser* parser, bool assign) {
-  int otherwise = jump(parser, OP_JUMP_CONDITIONAL);
+  int otherwise = jump(parser, OP_CONDITIONAL);
 
   int end = jump(parser, OP_JUMP);
 
@@ -485,12 +486,12 @@ static void block(Parser* parser) {
   consume(parser, TOKEN_CLOSE_BRACES, "Expect '}' after block.");
 }
 
-static void condition(Parser* parser) {
+static void conditional(Parser* parser) {
   expression(parser);
 
   consume(parser, TOKEN_COLON, "Expect ':' after condition.");
 
-  int then = jump(parser, OP_JUMP_CONDITIONAL);
+  int then = jump(parser, OP_CONDITIONAL);
 
   emit(parser, OP_POP);
 
@@ -511,14 +512,14 @@ static void condition(Parser* parser) {
   patch(parser, otherwise);
 }
 
-static void repeat(Parser* parser) {
+static void iterative(Parser* parser) {
   int start = parser->compiling->count;
 
   expression(parser);
 
   consume(parser, TOKEN_COLON, "Expect ':' after condition.");
 
-  int exit = jump(parser, OP_JUMP_CONDITIONAL);
+  int exit = jump(parser, OP_CONDITIONAL);
 
   emit(parser, OP_POP);
 
@@ -529,6 +530,63 @@ static void repeat(Parser* parser) {
   patch(parser, exit);
 
   emit(parser, OP_POP);
+}
+
+static void looping(Parser* parser) {
+  begin(parser);
+
+  consume(parser, TOKEN_OPEN_PARENTHESES, "Expect '(' after 'for' branch.");
+
+  if (match(parser, TOKEN_SEMICOLON) == false) {
+    if (match(parser, TOKEN_SET) == true) set(parser);
+    else {
+      expression(parser);
+      consume(parser, TOKEN_SEMICOLON, "Expect ';' after 'for' initialize.");
+    }
+  }
+
+  int start = parser->compiling->count;
+
+  int exit = -1;
+
+  if (match(parser, TOKEN_SEMICOLON) == false) {
+    expression(parser);
+
+    consume(parser, TOKEN_SEMICOLON, "Expect ';' after 'for' condition.");
+
+    exit = jump(parser, OP_CONDITIONAL);
+
+    emit(parser, OP_POP);
+  }
+
+  if (match(parser, TOKEN_CLOSE_PARENTHESES) == false) {
+    int body = jump(parser, OP_JUMP);
+
+    int increment = parser->compiling->count;
+
+    expression(parser);
+
+    emit(parser, OP_POP);
+
+    consume(parser, TOKEN_CLOSE_PARENTHESES, "Expect ')' after 'for' branch.");
+
+    loop(parser, start);
+
+    start = increment;
+
+    patch(parser, body);
+  }
+
+  statement(parser);
+
+  loop(parser, start);
+
+  if (exit >= 0) {
+    patch(parser, exit);
+    emit(parser, OP_POP);
+  }
+
+  end(parser);
 }
 
 static void statement(Parser* parser) {
@@ -545,9 +603,11 @@ static void statement(Parser* parser) {
     consume(parser, TOKEN_SEMICOLON, "Expect a ';' after instruction.");
   } 
   else if (match(parser, TOKEN_IF)) 
-    condition(parser);
+    conditional(parser);
   else if (match(parser, TOKEN_WHILE))
-    repeat(parser);
+    iterative(parser);
+  else if (match(parser, TOKEN_FOR))
+    looping(parser);
   else if (match(parser, TOKEN_EMPTY)) {
     emit(parser, OP_EMPTY);
     consume(parser, TOKEN_SEMICOLON, "Expect a ';' after instruction.");

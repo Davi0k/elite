@@ -302,7 +302,7 @@ static Results run(VM* vm) {
     do {
       uint16_t offset = READ_SHORT();
 
-      ip -= offset;
+      ip = ip - offset;
       
       COMPUTE_NEXT();
     } while(false);
@@ -311,12 +311,12 @@ static Results run(VM* vm) {
     do {
       uint16_t offset = READ_SHORT();
 
-      ip += offset;
+      ip = ip + offset;
      
       COMPUTE_NEXT();
     } while(false);
 
-  OP_JUMP_CONDITIONAL:
+  OP_CONDITIONAL:
     do {
       uint16_t offset = READ_SHORT();
 
