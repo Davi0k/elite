@@ -50,11 +50,11 @@ typedef struct {
   VM* vm;
 } Parser;
 
-typedef void (*Function)(Parser* parser, bool assign);
+typedef void (*Execute)(Parser* parser, bool assign);
 
 typedef struct {
-  Function prefix;
-  Function infix;
+  Execute prefix;
+  Execute infix;
   Precedences precedence;
 } Rule;
 

@@ -3,6 +3,7 @@
 
 #include "common.h"
 #include "vm.h"
+#include "utilities/chunk.h"
 #include "types/value.h"
 
 #define OBJECT_TYPE(value) ( AS_OBJECT(value)->type )
@@ -12,7 +13,8 @@
 #define AS_STRING(value) ( (String*)AS_OBJECT(value) )
 
 typedef enum {
-  OBJECT_STRING
+  OBJECT_STRING,
+  OBJECT_FUNCTION
 } Objects;
 
 typedef struct Object {
@@ -26,6 +28,13 @@ typedef struct String {
   char* content;
   uint32_t hash;
 } String;
+
+typedef struct Function {
+  Object Object;
+  String* identifier;
+  Chunk chunk;
+  int ariaty;
+} Function;
 
 String* allocate_string(VM* vm, const char* content, int length, uint32_t hash);
 

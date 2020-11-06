@@ -307,6 +307,17 @@ static Results run(VM* vm) {
       COMPUTE_NEXT();
     } while(false);
 
+  OP_LOOP_CONDITIONAL:
+    do {
+      uint16_t offset = READ_SHORT();
+
+      Value value = peek(&vm->stack, 0);
+
+      ip -= (falsey(value) ? 1 : 0) * offset;
+      
+      COMPUTE_NEXT();
+    } while(false);
+
   OP_JUMP:
     do {
       uint16_t offset = READ_SHORT();
@@ -316,7 +327,7 @@ static Results run(VM* vm) {
       COMPUTE_NEXT();
     } while(false);
 
-  OP_CONDITIONAL:
+  OP_JUMP_CONDITIONAL:
     do {
       uint16_t offset = READ_SHORT();
 

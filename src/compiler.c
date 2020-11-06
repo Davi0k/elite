@@ -94,6 +94,7 @@ Rule rules[] = {
   [ TOKEN_IF ] = { NULL, NULL, PRECEDENCE_NONE },
   [ TOKEN_ELSE ] = { NULL, NULL, PRECEDENCE_NONE },
   [ TOKEN_WHILE ] = { NULL, NULL, PRECEDENCE_NONE },
+  [ TOKEN_DO ] = { NULL, NULL, PRECEDENCE_NONE },
   [ TOKEN_FOR ] = { NULL, NULL, PRECEDENCE_NONE },
 
   [ TOKEN_DEFINE ] = { NULL, NULL, PRECEDENCE_NONE },
@@ -440,7 +441,7 @@ static void loop(Parser* parser, int start) {
 }
 
 static void and(Parser* parser, bool assign) {
-  int end = jump(parser, OP_CONDITIONAL);
+  int end = jump(parser, OP_JUMP_CONDITIONAL);
 
   emit(parser, OP_POP);
 
@@ -450,7 +451,7 @@ static void and(Parser* parser, bool assign) {
 }
 
 static void or(Parser* parser, bool assign) {
-  int otherwise = jump(parser, OP_CONDITIONAL);
+  int otherwise = jump(parser, OP_JUMP_CONDITIONAL);
 
   int end = jump(parser, OP_JUMP);
 
@@ -509,7 +510,7 @@ static void conditional(Parser* parser) {
 
   consume(parser, TOKEN_COLON, "Expect ':' after condition.");
 
-  int then = jump(parser, OP_CONDITIONAL);
+  int then = jump(parser, OP_JUMP_CONDITIONAL);
 
   emit(parser, OP_POP);
 
@@ -537,11 +538,31 @@ static void iterative(Parser* parser) {
 
   consume(parser, TOKEN_COLON, "Expect ':' after condition.");
 
-  int exit = jump(parser, OP_CONDITIONAL);
+  int exit = jump(parser, OP_JUMP_CONDITIONAL);
 
   emit(parser, OP_POP);
 
   statement(parser);
+
+  loop(parser, start);
+
+  patch(parser, exit);
+
+  emit(parser, OP_POP);
+}
+
+static void repeat(Parser* parser) {
+  int start = parser->compiling->count;
+
+  statement(parser);
+
+  consume(parser, TOKEN_WHILE, "Expect 'while' statement after instructions.");
+
+  expression(parser);
+
+  int exit = jump(parser, OP_JUMP_CONDITIONAL);
+
+  emit(parser, OP_POP);
 
   loop(parser, start);
 
@@ -572,7 +593,7 @@ static void looping(Parser* parser) {
 
     consume(parser, TOKEN_SEMICOLON, "Expect ';' after 'for' condition.");
 
-    exit = jump(parser, OP_CONDITIONAL);
+    exit = jump(parser, OP_JUMP_CONDITIONAL);
 
     emit(parser, OP_POP);
   }
@@ -624,6 +645,8 @@ static void statement(Parser* parser) {
     conditional(parser);
   else if (match(parser, TOKEN_WHILE))
     iterative(parser);
+  else if (match(parser, TOKEN_DO))
+    repeat(parser);
   else if (match(parser, TOKEN_FOR))
     looping(parser);
   else if (match(parser, TOKEN_EMPTY)) {
@@ -653,7 +676,7 @@ static void instruction(Parser* parser) {
 static void parse(Parser* parser, Precedences precedence) {
   advance(parser);
 
-  Function prefix = rules[parser->previous.type].prefix;
+  Execute prefix = rules[parser->previous.type].prefix;
 
   if (prefix == NULL) {
     error(parser, parser->previous, "Expect an expression.");
@@ -666,7 +689,7 @@ static void parse(Parser* parser, Precedences precedence) {
 
   while (precedence <= rules[parser->current.type].precedence) {
     advance(parser);
-    Function infix = rules[parser->previous.type].infix;
+    Execute infix = rules[parser->previous.type].infix;
     infix(parser, assign);
   }
 

@@ -122,7 +122,16 @@ static Types keyword(Tokenizer* tokenizer, int start, int length, const char* re
 static Types trie(Tokenizer* tokenizer) {
   switch (tokenizer->start[0]) {
     case 'a': return keyword(tokenizer, 1, 2, "nd", TOKEN_AND);
-    case 'd': return keyword(tokenizer, 1, 5, "efine", TOKEN_DEFINE);
+
+    case 'd': 
+      if (tokenizer->current - tokenizer->start > 1) {
+        switch (tokenizer->start[1]) {
+          case 'e': return keyword(tokenizer, 2, 4, "fine", TOKEN_DEFINE);
+          case 'o': return keyword(tokenizer, 2, 0, NULL_TERMINATOR, TOKEN_DO);
+        }
+      }
+
+      break;
 
     case 'e': 
       if (tokenizer->current - tokenizer->start > 1) {
