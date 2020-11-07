@@ -71,6 +71,12 @@ Function* new_function(VM* vm) {
   return function;
 }
 
+Native* new_native(VM* vm, Internal internal) {
+  Native* native = ALLOCATE_OBJECT(vm, Native, OBJECT_NATIVE);
+  native->internal = internal;
+  return native;
+}
+
 void print_object(Value value) {
   switch (OBJECT_TYPE(value)) {
     case OBJECT_STRING: {
@@ -85,6 +91,12 @@ void print_object(Value value) {
       if (function->identifier == NULL)
         printf("<Script>");
       else printf("<Function %s>", function->identifier->content);
+
+      break;
+    }
+
+    case OBJECT_NATIVE: {
+      printf("<Native Function>");
 
       break;
     }

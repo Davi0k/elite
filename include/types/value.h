@@ -6,6 +6,7 @@
 typedef struct Object Object;
 typedef struct String String;
 typedef struct Function Function;
+typedef struct Native Native;
 
 #define MPF_NEUTRAL NUMBER_FROM_VALUE(1.0)
 

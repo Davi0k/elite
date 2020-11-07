@@ -60,11 +60,7 @@ static void repl(VM* vm) {
 static void execute_file(VM* vm, const char* path) {
   char* source = read(path);
 
-  clock_t begin = clock();
   Results result = interpret(vm, source);
-  clock_t end = clock();
-
-  printf("\nExecution Time: %f Seconds\n", (double)(end - begin) / CLOCKS_PER_SEC);
 
   free(source);
 

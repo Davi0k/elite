@@ -36,6 +36,8 @@ void initialize_VM(VM* vm) {
 
   initialize_table(&vm->strings);
   initialize_table(&vm->globals);
+
+  natives(vm);
 }
 
 void free_VM(VM* vm) {
@@ -116,6 +118,18 @@ static bool call(VM* vm, Value value, int count) {
     switch (OBJECT_TYPE(value)) {
       case OBJECT_FUNCTION:
         return invoke(vm, AS_FUNCTION(value), count);
+
+      case OBJECT_NATIVE: {
+        Internal internal = AS_NATIVE(value);
+
+        Value result = internal(count, vm->stack.top - count);
+
+        vm->stack.top -= count + 1;
+
+        push(&vm->stack, result);
+
+        return true;
+      }
     }
   }
 

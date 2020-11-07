@@ -10,13 +10,20 @@
 
 #define IS_STRING(value) validate(value, OBJECT_STRING)
 #define IS_FUNCTION(value) validate(value, OBJECT_FUNCTION);
+#define IS_NATIVE(value) validate(value, OBJECT_NATIVE);
 
 #define AS_STRING(value) ( (String*)AS_OBJECT(value) )
 #define AS_FUNCTION(value) ( (Function*)AS_OBJECT(value) )
 
+#define AS_NATIVE(value) \
+  ( ( (Native*)AS_OBJECT(value) )->internal )
+
+typedef Value (*Internal)(int count, Value* arguments);
+
 typedef enum {
   OBJECT_STRING,
-  OBJECT_FUNCTION
+  OBJECT_FUNCTION,
+  OBJECT_NATIVE
 } Objects;
 
 typedef struct Object {
@@ -38,12 +45,19 @@ typedef struct Function {
   int arity;
 } Function;
 
+typedef struct Native {
+  Object object;
+  Internal internal;
+} Native;
+
 String* allocate_string(VM* vm, const char* content, int length, uint32_t hash);
 
 String* copy_string(VM* vm, const char* content, int length);
 String* take_string(VM* vm, const char* content, int length);
 
 Function* new_function(VM* vm);
+
+Native* new_native(VM* vm, Internal internal);
 
 void print_object(Value value);
 

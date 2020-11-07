@@ -11,6 +11,8 @@
 
 #define GMP_MAX_PRECISION 100024
 
+#define MAXIMUM_PRECISION 18
+
 #define FRAMES_MAX 128
 
 #define STACK_MAX ( FRAMES_MAX * (UINT8_MAX + 1) )

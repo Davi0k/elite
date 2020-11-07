@@ -31,13 +31,15 @@ typedef struct {
   Table strings, globals;
 } VM;
 
-extern Function* compile(VM* vm, const char* source);
-
 void reset_stack(VM* vm);
 
 void initialize_VM(VM* vm);
 void free_VM(VM* vm);
 
 Results interpret(VM* vm, const char* source);
+
+extern void natives(VM* vm);
+
+extern Function* compile(VM* vm, const char* source);
 
 #endif
