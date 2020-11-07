@@ -4,30 +4,11 @@
 
 #include "helpers/debug.h"
 #include "helpers/stack.h"
+#include "helpers/error.h"
 #include "utilities/memory.h"
 #include "types/object.h"
 #include "common.h"
 #include "vm.h"
-
-typedef enum {
-  EXPECT_ARGUMENTS_NUMBER,
-  STACK_OVERFLOW,
-  CANNOT_CALL,
-  MUST_BE_NUMBER,
-  MUST_BE_NUMBERS,
-  MUST_BE_NUMBERS_OR_STRINGS,
-  UNDEFINED_VARIABLE
-} RUN_TIME_ERRORS;
-
-const char* run_time[] = {
-  "Expected %d arguments but got %d.",
-  "A Stack Overflow error has occured.",
-  "Can only call functions and classes.",
-  "Operand must be a Number",
-  "Operands must be Numbers.",
-  "Operands must be two Numbers or two Strings.",
-  "Undefined variable '%s'.",
-};
 
 void initialize_VM(VM* vm) {
   reset_stack(vm);

@@ -55,6 +55,7 @@ bool equal(Value left, Value right) {
 
   switch (left.type) {
     case VALUE_NUMBER: return mpf_cmp(AS_NUMBER(left), AS_NUMBER(right)) == 0; 
+    
     case VALUE_BOOLEAN: return AS_BOOLEAN(left) == AS_BOOLEAN(right);
     
     case VALUE_OBJECT: return AS_OBJECT(left) == AS_OBJECT(right);

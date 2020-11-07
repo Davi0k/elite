@@ -7,60 +7,7 @@
 #include "compiler.h"
 #include "tokenizer.h"
 #include "types/object.h"
-
-typedef enum {
-  TOO_MANY_CONSTANTS,
-  TOO_MANY_LOCALS,
-  CANNOT_READ_INITIALIZER,
-  VARIABLE_ALREADY_DECLARE,
-  EXPECT_OPEN_FUNCTION,
-  EXPECT_CLOSE_FUNCTION,
-  MAXIMUM_PARAMETERS,
-  EXPECT_PARAMETER_IDENTIFIER,
-  MAXIMUM_JUMP_BODY,
-  MINIMUM_LOOP_BODY,
-  EXPECT_VARIABLE_IDENTIFIER,
-  EXPECT_SEMICOLON,
-  EXPECT_FUNCTION_IDENTIFIER,
-  EXPECT_BLOCK,
-  EXPECT_ARGUMENTS,
-  MAXIMUM_ARGUMENTS,
-  CANNOT_RETURN_SCRIPT,
-  EXPECT_EXPRESSION,
-  INVALID_ASSIGNMENT_TARGET,
-  EXPECT_COLON_CONDITION,
-  EXPECT_COLON_STATEMENT,
-  EXPECT_WHILE_STATEMENT,
-  EXPECT_OPEN_FOR,
-  EXPECT_CLOSE_FOR,
-} COMPILE_TIME_ERRORS;
-
-const char* compile_time[] = {
-  "Too many Constants in one single Chunk.",
-  "Too many local variables in Function.",
-  "Cannot read local variable in its own initializer.",
-  "A variable with this identifier has already been declared in this scope.",
-  "Expect '(' after Function identifier.",
-  "Expect ')' after Function parameters.",
-  "Cannot have more than 255 parameters.",
-  "Expect a parameter identifier.",
-  "Too much code to jump over.",
-  "Loop body too large.",
-  "Expect a variable identifier.",
-  "Expect ';' after instruction.",
-  "Expect a Function identifier.",
-  "Expect '}' after block.",
-  "Expect ')' after arguments.",
-  "Cannot have more than 255 arguments.",
-  "Cannot return from outside of a Function.",
-  "Expect an expression.",
-  "Invalid assignment Target.",
-  "Expect ':' after condition.",
-  "Expect ':' after else statement.",
-  "Expect 'while' statement after instructions.",
-  "Expect '(' before 'for' branch.",
-  "Expect '(' after 'for' branch."
-};
+#include "helpers/error.h"
 
 void set_compiler(Parser* parser, Compiler* compiler, Positions position) {
   compiler->enclosing = parser->compiler;
