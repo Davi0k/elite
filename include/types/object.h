@@ -9,8 +9,10 @@
 #define OBJECT_TYPE(value) ( AS_OBJECT(value)->type )
 
 #define IS_STRING(value) validate(value, OBJECT_STRING)
+#define IS_FUNCTION(value) validate(value, OBJECT_FUNCTION);
 
 #define AS_STRING(value) ( (String*)AS_OBJECT(value) )
+#define AS_FUNCTION(value) ( (Function*)AS_OBJECT(value) )
 
 typedef enum {
   OBJECT_STRING,
@@ -33,13 +35,15 @@ typedef struct Function {
   Object Object;
   String* identifier;
   Chunk chunk;
-  int ariaty;
+  int arity;
 } Function;
 
 String* allocate_string(VM* vm, const char* content, int length, uint32_t hash);
 
 String* copy_string(VM* vm, const char* content, int length);
 String* take_string(VM* vm, const char* content, int length);
+
+Function* new_function(VM* vm);
 
 void print_object(Value value);
 

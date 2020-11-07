@@ -6,14 +6,105 @@
 #include "common.h"
 #include "compiler.h"
 #include "tokenizer.h"
-#include "vm.h"
-
 #include "types/object.h"
 
-void set_compiler(Parser* parser, Compiler* compiler) {
+typedef enum {
+  TOO_MANY_CONSTANTS,
+  TOO_MANY_LOCALS,
+  CANNOT_READ_INITIALIZER,
+  VARIABLE_ALREADY_DECLARE,
+  EXPECT_OPEN_FUNCTION,
+  EXPECT_CLOSE_FUNCTION,
+  MAXIMUM_PARAMETERS,
+  EXPECT_PARAMETER_IDENTIFIER,
+  MAXIMUM_JUMP_BODY,
+  MINIMUM_LOOP_BODY,
+  EXPECT_VARIABLE_IDENTIFIER,
+  EXPECT_SEMICOLON,
+  EXPECT_FUNCTION_IDENTIFIER,
+  EXPECT_BLOCK,
+  EXPECT_ARGUMENTS,
+  MAXIMUM_ARGUMENTS,
+  CANNOT_RETURN_SCRIPT,
+  EXPECT_EXPRESSION,
+  INVALID_ASSIGNMENT_TARGET,
+  EXPECT_COLON_CONDITION,
+  EXPECT_COLON_STATEMENT,
+  EXPECT_WHILE_STATEMENT,
+  EXPECT_OPEN_FOR,
+  EXPECT_CLOSE_FOR,
+} COMPILE_TIME_ERRORS;
+
+const char* compile_time[] = {
+  "Too many Constants in one single Chunk.",
+  "Too many local variables in Function.",
+  "Cannot read local variable in its own initializer.",
+  "A variable with this identifier has already been declared in this scope.",
+  "Expect '(' after Function identifier.",
+  "Expect ')' after Function parameters.",
+  "Cannot have more than 255 parameters.",
+  "Expect a parameter identifier.",
+  "Too much code to jump over.",
+  "Loop body too large.",
+  "Expect a variable identifier.",
+  "Expect ';' after instruction.",
+  "Expect a Function identifier.",
+  "Expect '}' after block.",
+  "Expect ')' after arguments.",
+  "Cannot have more than 255 arguments.",
+  "Cannot return from outside of a Function.",
+  "Expect an expression.",
+  "Invalid assignment Target.",
+  "Expect ':' after condition.",
+  "Expect ':' after else statement.",
+  "Expect 'while' statement after instructions.",
+  "Expect '(' before 'for' branch.",
+  "Expect '(' after 'for' branch."
+};
+
+void set_compiler(Parser* parser, Compiler* compiler, Positions position) {
+  compiler->enclosing = parser->compiler;
+
+  compiler->function = NULL;
+  compiler->position = position;
+
   compiler->count = 0;
   compiler->scope = 0;
+
+  compiler->function = new_function(parser->vm);
+
   parser->compiler = compiler;
+
+  if (position != POSITION_SCRIPT)
+    parser->compiler->function->identifier = copy_string(parser->vm, parser->previous.start, parser->previous.length);
+
+  Local* local = &parser->compiler->locals[parser->compiler->count++];
+  local->depth = 0;
+  local->identifier.start = NULL_TERMINATOR;
+  local->identifier.length = 0;
+}
+
+static inline Chunk* get_current_chunk(Compiler* compiler) {
+  return &compiler->function->chunk;
+}
+
+static void emit(Parser* parser, uint8_t byte) {
+  write_chunk(get_current_chunk(parser->compiler), byte, parser->previous.line);
+}
+
+static void close(Parser* parser) {
+  emit(parser, OP_UNDEFINED);
+  emit(parser, OP_RETURN);
+}
+
+static Function* terminate_compiler(Parser* parser) {
+  close(parser);
+
+  Function* function = parser->compiler->function;
+
+  parser->compiler = parser->compiler->enclosing;
+
+  return function;
 }
 
 static void espression(Parser* parser);
@@ -31,6 +122,8 @@ static void and(Parser* parser, bool assign);
 static void or(Parser* parser, bool assign);
 
 static void variable(Parser* parser, bool assign);
+
+static void call(Parser* parser, bool assign);
 
 static void instruction(Parser* parser);
 static void statement(Parser* parser);
@@ -75,7 +168,7 @@ Rule rules[] = {
   [ TOKEN_COLON ] = { NULL, NULL, PRECEDENCE_NONE },
   [ TOKEN_DOT ] = { NULL, NULL, PRECEDENCE_NONE },
 
-  [ TOKEN_OPEN_PARENTHESES ] = { grouping, NULL, PRECEDENCE_NONE },
+  [ TOKEN_OPEN_PARENTHESES ] = { grouping, call, PRECEDENCE_CALL },
   [ TOKEN_CLOSE_PARENTHESES ] = { NULL, NULL, PRECEDENCE_NONE },
   [ TOKEN_OPEN_BRACKETS ] = { NULL, NULL, PRECEDENCE_NONE },
   [ TOKEN_CLOSE_BRACKETS ] = { NULL, NULL, PRECEDENCE_NONE },
@@ -103,16 +196,16 @@ Rule rules[] = {
   [ TOKEN_SEMICOLON ] = { NULL, NULL, PRECEDENCE_NONE}
 };
 
-static void error(Parser* parser, Token token, const char* message) {
+static void error(Parser* parser, Token token, const char* error) {
   if (parser->panic) return;
 
   parser->panic = true;
 
-  fprintf(stderr, "[Line %d] Error", token.line);
+  fprintf(stderr, "[Line N°%d] Error", token.line);
 
   fprintf(stderr, " at <%.*s>", token.length, token.start);
 
-  fprintf(stderr, ": %s\n", message);
+  fprintf(stderr, " -> %s\n", error);
 
   parser->error = true;
 }
@@ -136,17 +229,13 @@ static void consume(Parser* parser, Types type, const char* message) {
   if (parser->current.type == type) 
     return advance(parser);
 
-  error(parser, parser->current, message);
+  error(parser, parser->previous, message);
 }
 
 static bool match(Parser* parser, Types type) {
   if (check(parser, type) == false) return false;
   advance(parser);
   return true;
-}
-
-static void emit(Parser* parser, uint8_t byte) {
-  write_chunk(parser->compiling, byte, parser->previous.line);
 }
 
 static void stream(Parser* parser, int count, ...) {
@@ -163,10 +252,10 @@ static void stream(Parser* parser, int count, ...) {
 }
 
 static uint8_t make(Parser* parser, Value value) {
-  int constant = add_constant(parser->compiling, value);
+  int constant = add_constant(get_current_chunk(parser->compiler), value);
 
   if (constant > UINT8_MAX) {
-    error(parser, parser->previous, "Too many Constants in one single Chunk.");
+    error(parser, parser->previous, compile_time[TOO_MANY_CONSTANTS]);
     return 0;
   }
 
@@ -304,14 +393,14 @@ static uint8_t identifier(Parser* parser, Token* token) {
 }
 
 static void local(Parser* parser, Token identifier) {
-  if (parser->compiler->count == UINT8_COUNT) {
-    error(parser, parser->previous, "Too many local variables in function.");
+  if (parser->compiler->count == UINT8_MAX + 1) {
+    error(parser, parser->previous, compile_time[TOO_MANY_LOCALS]);
     return;
   }
 
   Local* local = &parser->compiler->locals[parser->compiler->count++];
   local->identifier = identifier;
-  local->depth = INITIALIZED;
+  local->depth = INITIALIZE;
 }
 
 static int resolve(Parser* parser, Token* identifier) {
@@ -319,14 +408,75 @@ static int resolve(Parser* parser, Token* identifier) {
     Local* local = &parser->compiler->locals[i];
     
     if (identifiers_equality(identifier, &local->identifier)) {
-      if (local->depth == INITIALIZED)
-        error(parser, parser->previous, "Can't read local variable in its own initializer.");
+      if (local->depth == INITIALIZE)
+        error(parser, parser->previous, compile_time[CANNOT_READ_INITIALIZER]);
 
       return i;
     }
   }
 
-  return INITIALIZED;
+  return INITIALIZE;
+}
+
+static void mark(Parser* parser) {
+  if (parser->compiler->scope == 0) return;
+
+  parser->compiler->locals[parser->compiler->count - 1].depth = parser->compiler->scope;
+}
+
+static void initialize(Parser* parser, uint8_t global) {
+  if (parser->compiler->scope == 0) {
+    emit(parser, OP_GLOBAL_INITIALIZE);
+    emit(parser, global);
+  }
+  else mark(parser);
+}
+
+static void declaration(Parser* parser) {
+  if (parser->compiler->scope == 0) return;
+
+  Token* identifier = &parser->previous;
+
+  for (int i = parser->compiler->count - 1; i >= 0; i--) {
+    Local* local = &parser->compiler->locals[i];
+
+    if (local->depth != INITIALIZE && local->depth < parser->compiler->scope) break;
+
+    if (identifiers_equality(identifier, &local->identifier))
+      error(parser, parser->previous, compile_time[VARIABLE_ALREADY_DECLARE]);
+  }
+
+  local(parser, *identifier);
+}
+
+static uint8_t definition(Parser* parser, const char* error) {
+  consume(parser, TOKEN_IDENTIFIER, error);
+
+  declaration(parser);
+
+  if (parser->compiler->scope > 0) return 0;
+
+  return identifier(parser, &parser->previous);
+}
+
+static void begin(Parser* parser) {
+  parser->compiler->scope++;
+}
+
+static void end(Parser* parser) {
+  parser->compiler->scope--;
+
+  Compiler* compiler = parser->compiler;
+
+  int count = compiler->count;
+
+  while (count > 0 && compiler->locals[count - 1].depth > compiler->scope)
+    count--;
+
+  emit(parser, OP_POP_N);
+  emit(parser, compiler->count - count);
+
+  compiler->count = count;
 }
 
 static void variable(Parser* parser, bool assign) {
@@ -374,39 +524,38 @@ static void variable(Parser* parser, bool assign) {
   emit(parser, argument);
 }
 
-static void declaration(Parser* parser) {
-  if (parser->compiler->scope == 0) return;
+static void function(Parser* parser, Positions position) {
+  Compiler compiler;
 
-  Token* identifier = &parser->previous;
+  set_compiler(parser, &compiler, position);
 
-  for (int i = parser->compiler->count - 1; i >= 0; i--) {
-    Local* local = &parser->compiler->locals[i];
+  begin(parser);
 
-    if (local->depth != INITIALIZED && local->depth < parser->compiler->scope) break;
+  if (match(parser, TOKEN_COLON) == false) {
+    consume(parser, TOKEN_OPEN_PARENTHESES, compile_time[EXPECT_OPEN_FUNCTION]);
 
-    if (identifiers_equality(identifier, &local->identifier))
-      error(parser, parser->previous, "Already variable with this name in this scope.");
+    if (check(parser, TOKEN_CLOSE_PARENTHESES) == false) {
+      do {
+        parser->compiler->function->arity++;
+
+        if (parser->compiler->function->arity > 255)
+          error(parser, parser->current, compile_time[MAXIMUM_PARAMETERS]);
+
+        uint8_t parameter = definition(parser, compile_time[EXPECT_PARAMETER_IDENTIFIER]);
+        
+        initialize(parser, parameter);
+      } while (match(parser, TOKEN_COMMA) == true);
+    }
+
+    consume(parser, TOKEN_CLOSE_PARENTHESES, compile_time[EXPECT_CLOSE_FUNCTION]);
   }
 
-  local(parser, *identifier);
-}
+  statement(parser);
 
-static uint8_t definition(Parser* parser, const char* error) {
-  consume(parser, TOKEN_IDENTIFIER, error);
+  Function* function = terminate_compiler(parser);
 
-  declaration(parser);
-
-  if (parser->compiler->scope > 0) return 0;
-
-  return identifier(parser, &parser->previous);
-}
-
-static void define(Parser* parser, uint8_t global) {
-  if (parser->compiler->scope == 0) {
-    emit(parser, OP_GLOBAL_INITIALIZE);
-    emit(parser, global);
-  }
-  else parser->compiler->locals[parser->compiler->count - 1].depth = parser->compiler->scope;
+  emit(parser, OP_CONSTANT);
+  emit(parser, make(parser, OBJECT(function)));
 }
 
 static int jump(Parser* parser, uint8_t instruction) {
@@ -415,26 +564,26 @@ static int jump(Parser* parser, uint8_t instruction) {
   emit(parser, 0xff);
   emit(parser, 0xff);
 
-  return parser->compiling->count - 2;
+  return get_current_chunk(parser->compiler)->count - 2;
 }
 
 static void patch(Parser* parser, int offset) {
-  int jump = parser->compiling->count - offset - 2;
+  int jump = get_current_chunk(parser->compiler)->count - offset - 2;
 
   if (jump > UINT16_MAX)
-    error(parser, parser->previous, "Too much code to jump over.");
+    error(parser, parser->previous, compile_time[MAXIMUM_JUMP_BODY]);
 
-  parser->compiling->code[offset] = (jump >> 8) & 0xff;
-  parser->compiling->code[offset + 1] = jump & 0xff;
+  get_current_chunk(parser->compiler)->code[offset] = (jump >> 8) & 0xff;
+  get_current_chunk(parser->compiler)->code[offset + 1] = jump & 0xff;
 }
 
 static void loop(Parser* parser, int start) {
   emit(parser, OP_LOOP);
 
-  int offset = parser->compiling->count - start + 2;
+  int offset = get_current_chunk(parser->compiler)->count - start + 2;
 
   if (offset > UINT16_MAX) 
-    error(parser, parser->previous, "Loop body too large.");
+    error(parser, parser->previous, compile_time[MINIMUM_LOOP_BODY]);
 
   emit(parser, (offset >> 8) & 0xff);
   emit(parser, offset & 0xff);
@@ -466,49 +615,62 @@ static void or(Parser* parser, bool assign) {
 
 static void set(Parser* parser) {
   do {
-    uint8_t global = definition(parser, "Expect variable identifier.");
+    uint8_t global = definition(parser, compile_time[EXPECT_VARIABLE_IDENTIFIER]);
 
     if (match(parser, TOKEN_COLON))
       expression(parser);
     else emit(parser, OP_UNDEFINED);
 
-    define(parser, global);
+    initialize(parser, global);
   } while(match(parser, TOKEN_COMMA));
 
-  consume(parser, TOKEN_SEMICOLON, "Expect a ';' after instruction.");
+  consume(parser, TOKEN_SEMICOLON, compile_time[EXPECT_SEMICOLON]);
 }
 
-static void begin(Parser* parser) {
-  parser->compiler->scope++;
-}
-
-static void end(Parser* parser) {
-  parser->compiler->scope--;
-
-  Compiler* compiler = parser->compiler;
-
-  int count = compiler->count;
-
-  while (count > 0 && compiler->locals[count - 1].depth > compiler->scope)
-    count--;
-
-  emit(parser, OP_POP_N);
-  emit(parser, compiler->count - count);
-
-  compiler->count = count;
+static void define(Parser* parser) {
+  uint8_t global = definition(parser, compile_time[EXPECT_FUNCTION_IDENTIFIER]);
+  mark(parser);
+  function(parser, POSITION_FUNCTION);
+  initialize(parser, global);
 }
 
 static void block(Parser* parser) {
   while (check(parser, TOKEN_CLOSE_BRACES) == false && check(parser, TOKEN_EOF) == false) 
     instruction(parser);
 
-  consume(parser, TOKEN_CLOSE_BRACES, "Expect '}' after block.");
+  consume(parser, TOKEN_CLOSE_BRACES, compile_time[EXPECT_BLOCK]);
+}
+
+static uint8_t arguments(Parser* parser) {
+  uint8_t count = 0;
+
+  if (check(parser, TOKEN_CLOSE_PARENTHESES) == false) {
+    do {
+      expression(parser);
+
+      if (count == 255)
+        error(parser, parser->previous, compile_time[MAXIMUM_ARGUMENTS]);
+
+      count++;
+    } while (match(parser, TOKEN_COMMA) == true);
+  }
+
+  consume(parser, TOKEN_CLOSE_PARENTHESES, compile_time[EXPECT_ARGUMENTS]);
+
+  return count;
+}
+
+static void call(Parser* parser, bool assign) {
+  uint8_t count = arguments(parser);
+
+  emit(parser, OP_CALL);
+  emit(parser, count);
 }
 
 static void conditional(Parser* parser) {
   expression(parser);
 
-  consume(parser, TOKEN_COLON, "Expect ':' after condition.");
+  consume(parser, TOKEN_COLON, compile_time[EXPECT_COLON_CONDITION]);
 
   int then = jump(parser, OP_JUMP_CONDITIONAL);
 
@@ -523,7 +685,7 @@ static void conditional(Parser* parser) {
   emit(parser, OP_POP);
 
   if (match(parser, TOKEN_ELSE)) {
-    consume(parser, TOKEN_COLON, "Expect ':' after else statement.");
+    consume(parser, TOKEN_COLON, compile_time[EXPECT_COLON_STATEMENT]);
     
     statement(parser);
   }
@@ -532,11 +694,11 @@ static void conditional(Parser* parser) {
 }
 
 static void iterative(Parser* parser) {
-  int start = parser->compiling->count;
+  int start = get_current_chunk(parser->compiler)->count;
 
   expression(parser);
 
-  consume(parser, TOKEN_COLON, "Expect ':' after condition.");
+  consume(parser, TOKEN_COLON, compile_time[EXPECT_COLON_CONDITION]);
 
   int exit = jump(parser, OP_JUMP_CONDITIONAL);
 
@@ -552,11 +714,11 @@ static void iterative(Parser* parser) {
 }
 
 static void repeat(Parser* parser) {
-  int start = parser->compiling->count;
+  int start = get_current_chunk(parser->compiler)->count;
 
   statement(parser);
 
-  consume(parser, TOKEN_WHILE, "Expect 'while' statement after instructions.");
+  consume(parser, TOKEN_WHILE, compile_time[EXPECT_WHILE_STATEMENT]);
 
   expression(parser);
 
@@ -574,24 +736,24 @@ static void repeat(Parser* parser) {
 static void looping(Parser* parser) {
   begin(parser);
 
-  consume(parser, TOKEN_OPEN_PARENTHESES, "Expect '(' after 'for' branch.");
+  consume(parser, TOKEN_OPEN_PARENTHESES, compile_time[EXPECT_OPEN_FOR]);
 
   if (match(parser, TOKEN_SEMICOLON) == false) {
     if (match(parser, TOKEN_SET) == true) set(parser);
     else {
       expression(parser);
-      consume(parser, TOKEN_SEMICOLON, "Expect ';' after 'for' initialize.");
+      consume(parser, TOKEN_SEMICOLON, compile_time[EXPECT_SEMICOLON]);
     }
   }
 
-  int start = parser->compiling->count;
+  int start = get_current_chunk(parser->compiler)->count;
 
   int exit = -1;
 
   if (match(parser, TOKEN_SEMICOLON) == false) {
     expression(parser);
 
-    consume(parser, TOKEN_SEMICOLON, "Expect ';' after 'for' condition.");
+    consume(parser, TOKEN_SEMICOLON, compile_time[EXPECT_SEMICOLON]);
 
     exit = jump(parser, OP_JUMP_CONDITIONAL);
 
@@ -601,13 +763,13 @@ static void looping(Parser* parser) {
   if (match(parser, TOKEN_CLOSE_PARENTHESES) == false) {
     int body = jump(parser, OP_JUMP);
 
-    int increment = parser->compiling->count;
+    int increment = get_current_chunk(parser->compiler)->count;
 
     expression(parser);
 
     emit(parser, OP_POP);
 
-    consume(parser, TOKEN_CLOSE_PARENTHESES, "Expect ')' after 'for' branch.");
+    consume(parser, TOKEN_CLOSE_PARENTHESES, compile_time[EXPECT_CLOSE_FOR]);
 
     loop(parser, start);
 
@@ -639,7 +801,7 @@ static void statement(Parser* parser) {
   else if (match(parser, TOKEN_PRINT)) {
     expression(parser);
     emit(parser, OP_PRINT);
-    consume(parser, TOKEN_SEMICOLON, "Expect a ';' after instruction.");
+    consume(parser, TOKEN_SEMICOLON, compile_time[EXPECT_SEMICOLON]);
   } 
   else if (match(parser, TOKEN_IF)) 
     conditional(parser);
@@ -649,24 +811,36 @@ static void statement(Parser* parser) {
     repeat(parser);
   else if (match(parser, TOKEN_FOR))
     looping(parser);
+  else if (match(parser, TOKEN_RETURN)) {
+    if (parser->compiler->position == POSITION_SCRIPT)
+      error(parser, parser->previous, compile_time[CANNOT_RETURN_SCRIPT]);
+
+    if (match(parser, TOKEN_SEMICOLON) == false) {
+      expression(parser);
+      consume(parser, TOKEN_SEMICOLON, compile_time[EXPECT_SEMICOLON]);
+      emit(parser, OP_RETURN);
+    } else close(parser);
+  }
   else if (match(parser, TOKEN_EMPTY)) {
     emit(parser, OP_EMPTY);
-    consume(parser, TOKEN_SEMICOLON, "Expect a ';' after instruction.");
+    consume(parser, TOKEN_SEMICOLON, compile_time[EXPECT_SEMICOLON]);
   }
   else if (match(parser, TOKEN_EXIT)) {
     emit(parser, OP_EXIT);
-    consume(parser, TOKEN_SEMICOLON, "Expect a ';' after instruction.");
+    consume(parser, TOKEN_SEMICOLON, compile_time[EXPECT_SEMICOLON]);
   }
   else {
     expression(parser);
     emit(parser, OP_POP);
-    consume(parser, TOKEN_SEMICOLON, "Expect a ';' after instruction.");
+    consume(parser, TOKEN_SEMICOLON, compile_time[EXPECT_SEMICOLON]);
   }
 }
 
 static void instruction(Parser* parser) {
   if (match(parser, TOKEN_SET))
     set(parser);
+  else if (match(parser, TOKEN_DEFINE))
+    define(parser);
   else statement(parser);
 
   if (parser->panic) 
@@ -679,7 +853,7 @@ static void parse(Parser* parser, Precedences precedence) {
   Execute prefix = rules[parser->previous.type].prefix;
 
   if (prefix == NULL) {
-    error(parser, parser->previous, "Expect an expression.");
+    error(parser, parser->previous, compile_time[EXPECT_EXPRESSION]);
     return;
   }
 
@@ -694,30 +868,28 @@ static void parse(Parser* parser, Precedences precedence) {
   }
 
   if (assign && match(parser, TOKEN_EQUAL))
-    error(parser, parser->previous, "Invalid assignment Target.");
+    error(parser, parser->previous, compile_time[INVALID_ASSIGNMENT_TARGET]);
 }
 
-bool compile(VM* vm, Chunk* chunk, const char* source) {
+Function* compile(VM* vm, const char* source) {
   Parser parser; 
 
   parser.vm = vm;
 
-  parser.compiling = chunk;
+  parser.error = false; parser.panic = false;
 
   set_tokenizer(&parser.tokenizer, source);
 
   Compiler compiler;
 
-  set_compiler(&parser, &compiler);
-
-  parser.error = false; parser.panic = false;
+  set_compiler(&parser, &compiler, POSITION_SCRIPT);
 
   advance(&parser);
   
   while (match(&parser, TOKEN_EOF) == false)
     instruction(&parser);
 
-  emit(&parser, OP_EXIT);
+  Function* function = terminate_compiler(&parser);
 
-  return !parser.error;
+  return parser.error ? NULL : function;
 }

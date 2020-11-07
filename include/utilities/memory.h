@@ -26,6 +26,4 @@ void* reallocate(void* pointer, size_t oldest, size_t newest);
 
 void free_object(Object* object);
 
-void free_vm_objects(VM* vm);
-
 #endif

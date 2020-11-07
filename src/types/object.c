@@ -60,10 +60,33 @@ String* take_string(VM* vm, const char* content, int length) {
   return allocate_string(vm, content, length, hash);
 }
 
+Function* new_function(VM* vm) {
+  Function* function = ALLOCATE_OBJECT(vm, Function, OBJECT_FUNCTION);
+
+  function->arity = 0;
+  function->identifier = NULL;
+
+  initialize_chunk(&function->chunk);
+
+  return function;
+}
+
 void print_object(Value value) {
   switch (OBJECT_TYPE(value)) {
-    case OBJECT_STRING:
+    case OBJECT_STRING: {
       printf("%s", AS_STRING(value)->content);
+      
       break;
+    }
+
+    case OBJECT_FUNCTION: {
+      Function* function = AS_FUNCTION(value);
+
+      if (function->identifier == NULL)
+        printf("<Script>");
+      else printf("<Function %s>", function->identifier->content);
+
+      break;
+    }
   }
 }

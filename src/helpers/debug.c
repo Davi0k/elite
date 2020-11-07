@@ -56,12 +56,14 @@ int disassemble_instruction(Chunk* chunk, int offset) {
 
   switch (instruction) {
     case OP_LOOP:
+    case OP_LOOP_CONDITIONAL:
     case OP_JUMP:
     case OP_JUMP_CONDITIONAL:
       return jump_representation(strings[instruction], 1, chunk, offset);
 
     case OP_LOCAL_SET:
     case OP_LOCAL_GET:
+    case OP_CALL:
       return byte_representation(strings[instruction], chunk, offset);
 
     case OP_CONSTANT:
@@ -73,6 +75,7 @@ int disassemble_instruction(Chunk* chunk, int offset) {
     case OP_TRUE:
     case OP_FALSE:
     case OP_VOID:
+    case OP_UNDEFINED:
     case OP_NEGATION:
     case OP_ADD:
     case OP_SUBTRACT:
@@ -85,6 +88,8 @@ int disassemble_instruction(Chunk* chunk, int offset) {
     case OP_LESS:
     case OP_PRINT:
     case OP_POP:
+    case OP_POP_N:
+    case OP_RETURN:
     case OP_EXIT:
       return simple_representation(strings[instruction], offset);
 

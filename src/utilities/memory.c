@@ -23,15 +23,12 @@ void free_object(Object* object) {
       FREE(String, object);
       break;
     }
-  }
-}
 
-void free_vm_objects(VM* vm) {
-  Object* object = vm->objects;
-
-  while (object != NULL) {
-    Object* next = object->next;
-    free_object(object);
-    object = next;
+    case OBJECT_FUNCTION: {
+      Function* function = (Function*)object;
+      free_chunk(&function->chunk);
+      FREE(Function, object);
+      break;
+    }
   }
 }

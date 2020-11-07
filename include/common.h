@@ -5,10 +5,14 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "gmp.h"
+
 #define NULL_TERMINATOR '\0'
 
 #define GMP_MAX_PRECISION 100024
 
-#include "gmp.h"
+#define FRAMES_MAX 128
+
+#define STACK_MAX ( FRAMES_MAX * (UINT8_MAX + 1) )
 
 #endif

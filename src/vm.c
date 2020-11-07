@@ -2,17 +2,35 @@
 #include <stdarg.h>
 #include <string.h>
 
-#include "common.h"
-#include "compiler.h"
-#include "vm.h"
-
+#include "helpers/debug.h"
+#include "helpers/stack.h"
 #include "utilities/memory.h"
 #include "types/object.h"
+#include "common.h"
+#include "vm.h"
 
-#include "helpers/debug.h"
+typedef enum {
+  EXPECT_ARGUMENTS_NUMBER,
+  STACK_OVERFLOW,
+  CANNOT_CALL,
+  MUST_BE_NUMBER,
+  MUST_BE_NUMBERS,
+  MUST_BE_NUMBERS_OR_STRINGS,
+  UNDEFINED_VARIABLE
+} RUN_TIME_ERRORS;
+
+const char* run_time[] = {
+  "Expected %d arguments but got %d.",
+  "A Stack Overflow error has occured.",
+  "Can only call functions and classes.",
+  "Operand must be a Number",
+  "Operands must be Numbers.",
+  "Operands must be two Numbers or two Strings.",
+  "Undefined variable '%s'.",
+};
 
 void initialize_VM(VM* vm) {
-  reset_stack(&vm->stack);
+  reset_stack(vm);
 
   vm->objects = NULL;
 
@@ -21,36 +39,31 @@ void initialize_VM(VM* vm) {
 }
 
 void free_VM(VM* vm) {
-  free_vm_objects(vm);
+  Object* object = vm->objects;
+
+  while (object != NULL) {
+    Object* next = object->next;
+    free_object(object);
+    object = next;
+  }
 
   free_table(&vm->strings); 
   free_table(&vm->globals); 
 }
 
-void reset_stack(Stack* stack) {
-  stack->top = stack->content;
-}
+void reset_stack(VM* vm) {
+  vm->stack.top = vm->stack.content;
 
-void push(Stack* stack, Value value) {
-  *stack->top = value;
-  stack->top++;
-}
-
-Value pop(Stack* stack, int distance) {
-  stack->top = stack->top - distance;
-
-  return *stack->top;
-}
-
-static Value peek(Stack* stack, int distance) {
-  return stack->top[- 1 - distance];
+  vm->count = 0;
 }
 
 static bool falsey(Value value) {
-  return IS_VOID(value) || IS_UNDEFINED(value) || (IS_BOOLEAN(value) && AS_BOOLEAN(value) == false);
+  return IS_VOID(value) || 
+         IS_UNDEFINED(value) || 
+         (IS_BOOLEAN(value) && AS_BOOLEAN(value) == false);
 }
 
-static void runtime(VM* vm, uint8_t* ip, const char* message, ...) {
+static void error(VM* vm, const char* message, ...) {
   va_list list;
 
   va_start(list, message);
@@ -61,26 +74,69 @@ static void runtime(VM* vm, uint8_t* ip, const char* message, ...) {
 
   fputs("\n", stderr);
 
-  size_t instruction = ip - vm->chunk->code - 1;
-  int line = vm->chunk->lines[instruction];
-  fprintf(stderr, "[Line %d] in script\n", line);
+  for (int i = vm->count - 1; i >= 0; i--) {
+    Frame* frame = &vm->frames[i];
 
-  reset_stack(&vm->stack);
+    Function* function = frame->function;
+
+    size_t instruction = frame->ip - function->chunk.code - 1;
+
+    fprintf(stderr, "[Line N°%d] in ", function->chunk.lines[instruction]);
+
+    if (function->identifier == NULL)
+      fprintf(stderr, "Script.\n");
+    else fprintf(stderr, "'%s' Function\n", function->identifier->content);
+  }
+
+  reset_stack(vm);
+}
+
+static bool invoke(VM* vm, Function* function, int count) {
+  if (count != function->arity) {
+    error(vm,  run_time[EXPECT_ARGUMENTS_NUMBER], function->arity, count);
+    return false;
+  }
+
+  if (vm->count == FRAMES_MAX) {
+    error(vm, run_time[STACK_OVERFLOW]);
+    return false;
+  }
+
+  Frame* frame = &vm->frames[vm->count++];
+  frame->function = function;
+  frame->ip = function->chunk.code;
+
+  frame->slots = vm->stack.top - count - 1;
+
+  return true;
+}
+
+static bool call(VM* vm, Value value, int count) {
+  if (IS_OBJECT(value)) {
+    switch (OBJECT_TYPE(value)) {
+      case OBJECT_FUNCTION:
+        return invoke(vm, AS_FUNCTION(value), count);
+    }
+  }
+
+  error(vm, run_time[CANNOT_CALL]);
 }
 
 static Results run(VM* vm) {
-  #define READ_BYTE() ( *++ip )
+  Frame* frame = &vm->frames[vm->count - 1];
 
-  #define READ_SHORT() ( ip += 2, (uint16_t)((ip[-1] << 8) | ip[0]) )
+  #define READ_BYTE() ( *frame->ip++ )
 
-  #define READ_CONSTANT() ( vm->chunk->constants.values[READ_BYTE()] )
+  #define READ_SHORT() ( frame->ip += 2, (uint16_t)((frame->ip[-2] << 8) | frame->ip[-1]) )
+
+  #define READ_CONSTANT() ( frame->function->chunk.constants.values[READ_BYTE()] )
 
   #define COMPUTE_NEXT() goto *jump_table[READ_BYTE()]
 
   #define BINARY_OPERATION(operator) \
     do { \
       if (!IS_NUMBER(peek(&vm->stack, 0)) || !IS_NUMBER(peek(&vm->stack, 1))) { \
-        runtime(vm, ip, "Operands must be Numbers."); \
+        error(vm, run_time[MUST_BE_NUMBERS]); \
         return INTERPRET_RUNTIME_ERROR; \
       } \
       Value right = pop(&vm->stack, 1); \
@@ -107,24 +163,21 @@ static Results run(VM* vm) {
         push(&vm->stack, BOOLEAN(comparison)); \
         COMPUTE_NEXT(); \
       } \
-      runtime(vm, ip, "Operands must be two Numbers or two Strings."); \
+      error(vm, run_time[MUST_BE_NUMBERS_OR_STRINGS]); \
       return INTERPRET_RUNTIME_ERROR; \
     } while(false)
-  
-  register uint8_t* ip = vm->chunk->code;
 
   static void* jump_table[] = {
     FOREACH(COMPUTED)
   };
 
-  goto *jump_table[*ip];
+  COMPUTE_NEXT();
 
-  OP_CONSTANT:
-    do {
-      Value constant = READ_CONSTANT();
-      push(&vm->stack, constant);
-      COMPUTE_NEXT();
-    } while(false);
+  OP_CONSTANT: {   
+    Value constant = READ_CONSTANT();
+    push(&vm->stack, constant);
+    COMPUTE_NEXT();
+  } 
 
   OP_TRUE: push(&vm->stack, BOOLEAN(true)); COMPUTE_NEXT();
 
@@ -136,7 +189,7 @@ static Results run(VM* vm) {
 
   OP_NEGATION:
     if (!IS_NUMBER(peek(&vm->stack, 0))) {
-      runtime(vm, ip, "Operand must be a Number.");
+      error(vm, run_time[MUST_BE_NUMBER]);
 
       return INTERPRET_RUNTIME_ERROR;
     }
@@ -187,7 +240,7 @@ static Results run(VM* vm) {
       COMPUTE_NEXT();
     }
 
-    runtime(vm, ip, "Operands must be two Numbers or two Strings.");
+    error(vm, run_time[MUST_BE_NUMBERS_OR_STRINGS]);
 
     return INTERPRET_RUNTIME_ERROR;
 
@@ -199,7 +252,7 @@ static Results run(VM* vm) {
 
   OP_POWER: 
     if (!IS_NUMBER(peek(&vm->stack, 0)) || !IS_NUMBER(peek(&vm->stack, 1))) { 
-      runtime(vm, ip, "Operands must be Numbers."); 
+      error(vm, run_time[MUST_BE_NUMBER]); 
       return INTERPRET_RUNTIME_ERROR; 
     } 
 
@@ -218,24 +271,22 @@ static Results run(VM* vm) {
 
     COMPUTE_NEXT();
 
-  OP_NOT:
-    do {
-      bool result = falsey(pop(&vm->stack, 1));
-      push(&vm->stack, BOOLEAN(result));
-      COMPUTE_NEXT();
-    } while(false);
+  OP_NOT: {
+    bool result = falsey(pop(&vm->stack, 1));
+    push(&vm->stack, BOOLEAN(result));
+    COMPUTE_NEXT();
+  }
 
-  OP_EQUAL:
-    do {
-      Value right = pop(&vm->stack, 1);
-      Value left = pop(&vm->stack, 1);
+  OP_EQUAL: {
+    Value right = pop(&vm->stack, 1);
+    Value left = pop(&vm->stack, 1);
 
-      bool result = equal(left, right);
+    bool result = equal(left, right);
 
-      push(&vm->stack, BOOLEAN(result));
+    push(&vm->stack, BOOLEAN(result));
 
-      COMPUTE_NEXT();
-    } while(false);
+    COMPUTE_NEXT();
+  }
 
   OP_GREATER: BINARY_COMPARISON(>); COMPUTE_NEXT();
 
@@ -246,110 +297,132 @@ static Results run(VM* vm) {
     printf("\n");
     COMPUTE_NEXT();
 
-  OP_GLOBAL_INITIALIZE:
-    do {
-      String* identifier = AS_STRING(READ_CONSTANT());
-      table_set(&vm->globals, identifier, peek(&vm->stack, 0));
-      pop(&vm->stack, 1);
+  OP_GLOBAL_INITIALIZE: {
+    String* identifier = AS_STRING(READ_CONSTANT());
+    table_set(&vm->globals, identifier, peek(&vm->stack, 0));
+    pop(&vm->stack, 1);
 
-      COMPUTE_NEXT();
-    } while(false);
+    COMPUTE_NEXT();
+  } 
 
-  OP_GLOBAL_SET:
-    do {
-      String* identifier = AS_STRING(READ_CONSTANT());
+  OP_GLOBAL_SET: {
+    String* identifier = AS_STRING(READ_CONSTANT());
 
-      if (table_set(&vm->globals, identifier, peek(&vm->stack, 0))) {
-        table_delete(&vm->globals, identifier);
-        runtime(vm, ip, "Undefined variable '%s'.", identifier->content);
-        return INTERPRET_RUNTIME_ERROR;
-      }
+    if (table_set(&vm->globals, identifier, peek(&vm->stack, 0))) {
+      table_delete(&vm->globals, identifier);
+      error(vm, run_time[UNDEFINED_VARIABLE], identifier->content);
+      return INTERPRET_RUNTIME_ERROR;
+    }
 
-      COMPUTE_NEXT();
-    } while(false);
+    COMPUTE_NEXT();
+  }
 
-  OP_GLOBAL_GET:
-    do {
-      String* identifier = AS_STRING(READ_CONSTANT());
+  OP_GLOBAL_GET: {
+    String* identifier = AS_STRING(READ_CONSTANT());
 
-      Value value;
+    Value value;
 
-      if (table_get(&vm->globals, identifier, &value) == false) {
-        runtime(vm, ip, "Undefined variable '%s'.", identifier->content);
-        return INTERPRET_RUNTIME_ERROR;
-      }
+    if (table_get(&vm->globals, identifier, &value) == false) {
+      error(vm, run_time[UNDEFINED_VARIABLE], identifier->content);
+      return INTERPRET_RUNTIME_ERROR;
+    }
 
-      push(&vm->stack, value);
+    push(&vm->stack, value);
 
-      COMPUTE_NEXT();
-    } while(false);
+    COMPUTE_NEXT();
+  }
 
-  OP_LOCAL_SET:
-    do {
-      uint8_t slot = READ_BYTE();
-      vm->stack.content[slot] = peek(&vm->stack, 0);
-      COMPUTE_NEXT();
-    } while(false);
+  OP_LOCAL_SET: {
+    uint8_t slot = READ_BYTE();
+    frame->slots[slot] = peek(&vm->stack, 0);
+    COMPUTE_NEXT();
+  }
 
-  OP_LOCAL_GET:
-    do {
-      uint8_t slot = READ_BYTE();
-      push(&vm->stack, vm->stack.content[slot]);
-      COMPUTE_NEXT();
-    } while(false);
+  OP_LOCAL_GET: {
+    uint8_t slot = READ_BYTE();
+    push(&vm->stack, frame->slots[slot]);
+    COMPUTE_NEXT();
+  }
 
-  OP_LOOP:
-    do {
-      uint16_t offset = READ_SHORT();
+  OP_LOOP: {
+    uint16_t offset = READ_SHORT();
 
-      ip = ip - offset;
-      
-      COMPUTE_NEXT();
-    } while(false);
+    frame->ip = frame->ip - offset;
+    
+    COMPUTE_NEXT();
+  }
 
-  OP_LOOP_CONDITIONAL:
-    do {
-      uint16_t offset = READ_SHORT();
+  OP_LOOP_CONDITIONAL: {
+    uint16_t offset = READ_SHORT();
 
-      Value value = peek(&vm->stack, 0);
+    Value value = peek(&vm->stack, 0);
 
-      ip -= (falsey(value) ? 1 : 0) * offset;
-      
-      COMPUTE_NEXT();
-    } while(false);
+    frame->ip -= (falsey(value) ? 1 : 0) * offset;
+    
+    COMPUTE_NEXT();
+  } 
 
-  OP_JUMP:
-    do {
-      uint16_t offset = READ_SHORT();
+  OP_JUMP: {
+    uint16_t offset = READ_SHORT();
 
-      ip = ip + offset;
-     
-      COMPUTE_NEXT();
-    } while(false);
+    frame->ip = frame->ip + offset;
+    
+    COMPUTE_NEXT();
+  }
 
-  OP_JUMP_CONDITIONAL:
-    do {
-      uint16_t offset = READ_SHORT();
+  OP_JUMP_CONDITIONAL: {
+    uint16_t offset = READ_SHORT();
 
-      Value value = peek(&vm->stack, 0);
+    Value value = peek(&vm->stack, 0);
 
-      ip += (falsey(value) ? 1 : 0) * offset;
-      
-      COMPUTE_NEXT();
-    } while(false);
+    frame->ip += (falsey(value) ? 1 : 0) * offset;
+    
+    COMPUTE_NEXT();
+  } 
 
   OP_POP: 
     pop(&vm->stack, 1); 
     COMPUTE_NEXT();
 
-  OP_POP_N:
-    do {
-      uint8_t count = READ_BYTE();
+  OP_POP_N: {
+    uint8_t count = READ_BYTE();
 
-      pop(&vm->stack, count);
+    pop(&vm->stack, count);
 
-      COMPUTE_NEXT();
-    } while(false);
+    COMPUTE_NEXT();
+  } 
+
+  OP_CALL: {
+    int count = READ_BYTE();
+
+    Value value = peek(&vm->stack, count);
+
+    if (call(vm, value, count) == false)
+      return INTERPRET_RUNTIME_ERROR;
+
+    frame = &vm->frames[vm->count - 1];
+
+    COMPUTE_NEXT();
+  }
+
+  OP_RETURN: {
+    Value result = pop(&vm->stack, 1);
+
+    vm->count--;
+
+    if (vm->count == 0) {
+      pop(&vm->stack, 1);
+      return INTERPRET_OK;
+    }
+
+    vm->stack.top = frame->slots;
+
+    push(&vm->stack, result);
+
+    frame = &vm->frames[vm->count - 1];
+
+    COMPUTE_NEXT();
+  }
 
   OP_EMPTY: COMPUTE_NEXT();
 
@@ -364,20 +437,13 @@ static Results run(VM* vm) {
 }
 
 Results interpret(VM* vm, const char* source) {
-  Chunk chunk;
+  Function* function = compile(vm, source);
 
-  initialize_chunk(&chunk);
+  if (function == NULL) return INTERPRET_COMPILE_ERROR;
 
-  if(!compile(vm, &chunk, source)) {
-    free_chunk(&chunk);
-    return INTERPRET_COMPILE_ERROR;
-  }
+  push(&vm->stack, OBJECT(function));
 
-  vm->chunk = &chunk;
+  call(vm, OBJECT(function), 0);
 
-  Results result = run(vm);
-
-  free_chunk(&chunk);
-
-  return result;
+  return run(vm);
 }

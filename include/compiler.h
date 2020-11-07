@@ -5,9 +5,7 @@
 #include "tokenizer.h"
 #include "utilities/chunk.h"
 
-#define UINT8_COUNT UINT8_MAX + 1
-
-#define INITIALIZED -1
+#define INITIALIZE -1
 
 typedef enum {
   PRECEDENCE_NONE,
@@ -23,13 +21,24 @@ typedef enum {
   PRECEDENCE_PRIMARY
 } Precedences;
 
+typedef enum {
+  POSITION_FUNCTION,
+  POSITION_SCRIPT
+} Positions;
+
 typedef struct {
   Token identifier;
   int depth;
 } Local;
 
-typedef struct {
-  Local locals[UINT8_COUNT];
+typedef struct Compiler {
+  struct Compiler* enclosing;
+
+  Function* function;
+
+  Positions position;
+
+  Local locals[UINT8_MAX + 1];
   int count;
   int scope;
 } Compiler;
@@ -42,8 +51,6 @@ typedef struct {
 
   bool error;
   bool panic;
-
-  Chunk* compiling;
 
   Compiler* compiler;
 
@@ -58,8 +65,8 @@ typedef struct {
   Precedences precedence;
 } Rule;
 
-void set_compiler(Parser* parser, Compiler* compiler);
+void set_compiler(Parser* parser, Compiler* compiler, Positions position);
 
-bool compile(VM* vm, Chunk* chunk, const char* source);
+Function* compile(VM* vm, const char* source);
 
 #endif
