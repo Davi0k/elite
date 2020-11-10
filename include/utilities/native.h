@@ -5,17 +5,22 @@
 #include "utilities/table.h"
 #include "types/value.h"
 
+typedef struct VM VM;
+
 typedef struct {
+  VM* vm;
+
   bool error;
+
   char message[LINE_LENGTH_MAX];
 } Handler;
 
-typedef Value (*Internal)(Value* arguments, int count, Handler* handler);
+void set_handler(Handler* handler, VM* vm);
 
-void set_handler(Handler* handler);
+Value stopwatch_native(int count, Value* arguments, Handler* handler);
+Value number_native(int count, Value* arguments, Handler* handler);
+Value print_native(int count, Value* arguments, Handler* handler);
 
-Value stopwatch(Value* arguments, int count, Handler* handler);
-
-Value print(Value* arguments, int count, Handler* handler);
+typedef Value (*Internal)(int count, Value* arguments, Handler* handler);
 
 #endif

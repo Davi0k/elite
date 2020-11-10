@@ -17,6 +17,13 @@ void* reallocate(void* pointer, size_t oldest, size_t newest) {
 
 void free_object(Object* object) {
   switch (object->type) {
+    case OBJECT_NUMBER: {
+      Number* number = (Number*)object;
+      mpf_clear(number->content);
+      FREE(Number, number);
+      break;
+    }
+
     case OBJECT_STRING: {
       String* string = (String*)object;
       FREE_ARRAY(char, string->content, string->length + 1);

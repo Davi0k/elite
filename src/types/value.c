@@ -5,36 +5,6 @@
 #include "types/value.h"
 #include "types/object.h"
 
-Value NUMBER(mpf_t number) {
-  Value value;
-
-  value.type = VALUE_NUMBER;
-
-  mpf_init_set(value.content.number, number);
-
-  return value;
-}
-
-Value NUMBER_FROM_VALUE(double number) {
-  Value value;
-
-  value.type = VALUE_NUMBER;
-
-  mpf_init_set_d(value.content.number, number);
-
-  return value;
-}
-
-Value NUMBER_FROM_STRING(const char* number) {
-  Value value;
-
-  value.type = VALUE_NUMBER;
-
-  mpf_init_set_str(value.content.number, number, strlen(number));
-
-  return value;
-}
-
 void initialize_constants(Constants* constants) {
   constants->values = NULL;
   constants->capacity = 0;
@@ -63,12 +33,14 @@ void write_constants(Constants* constants, Value value) {
 bool equal(Value left, Value right) {
   if (left.type != right.type) return false;
 
-  switch (left.type) {
-    case VALUE_NUMBER: return mpf_cmp(AS_NUMBER(left), AS_NUMBER(right)) == 0; 
-    
+  switch (left.type) {  
     case VALUE_BOOLEAN: return AS_BOOLEAN(left) == AS_BOOLEAN(right);
     
-    case VALUE_OBJECT: return AS_OBJECT(left) == AS_OBJECT(right);
+    case VALUE_OBJECT: {
+      if (OBJECT_TYPE(left) == OBJECT_NUMBER)
+        return mpf_cmp(AS_NUMBER(left), AS_NUMBER(right)) == 0; 
+      else return AS_OBJECT(left) == AS_OBJECT(right);
+    }
 
     case VALUE_VOID: return true;
 
@@ -80,8 +52,6 @@ bool equal(Value left, Value right) {
 
 void print_value(Value value) {
   switch (value.type) {
-    case VALUE_NUMBER: gmp_printf("%.Ff", AS_NUMBER(value)); break;
-
     case VALUE_BOOLEAN: printf(AS_BOOLEAN(value) ? "true" : "false"); break;
 
     case VALUE_OBJECT: print_object(value); break;

@@ -20,7 +20,7 @@ typedef struct {
   Value* slots;
 } Frame;
 
-typedef struct {
+typedef struct VM {
   Frame frames[FRAMES_MAX];
 
   int count;

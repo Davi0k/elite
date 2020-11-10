@@ -33,8 +33,9 @@ void initialize_VM(VM* vm) {
   initialize_table(&vm->strings);
   initialize_table(&vm->globals);
 
-  native(vm, "stopwatch", stopwatch);
-  native(vm, "print", print);
+  native(vm, "stopwatch", stopwatch_native);
+  native(vm, "number", number_native);
+  native(vm, "print", print_native);
 }
 
 void free_VM(VM* vm) {
@@ -113,11 +114,11 @@ static bool call(VM* vm, Value value, int count) {
       case OBJECT_NATIVE: {
         Handler handler;
 
-        set_handler(&handler);
+        set_handler(&handler, vm);
 
         Internal internal = AS_NATIVE(value);
 
-        Value result = internal(vm->stack.top - count, count, &handler);
+        Value result = internal(count, vm->stack.top - count, &handler);
 
         vm->stack.top -= count + 1;
 
@@ -154,8 +155,8 @@ static Results run(VM* vm) {
       Value right = pop(&vm->stack, 1); \
       Value left = pop(&vm->stack, 1); \
       mpf_t result; mpf_init(result); \
-      operator(result, left.content.number, right.content.number); \
-      push(&vm->stack, NUMBER(result)); \
+      operator(result, AS_NUMBER(left), AS_NUMBER(right)); \
+      push(&vm->stack, NUMBER(vm, result)); \
     } while(false) 
 
   #define BINARY_COMPARISON(operator) \
@@ -212,22 +213,13 @@ static Results run(VM* vm) {
 
     mpf_neg(number, AS_NUMBER(pop(&vm->stack, 1)));
 
-    push(&vm->stack, NUMBER(number));
+    push(&vm->stack, NUMBER(vm, number));
 
     COMPUTE_NEXT();
   
   OP_ADD: 
     if (IS_NUMBER(peek(&vm->stack, 0)) && IS_NUMBER(peek(&vm->stack, 1))) {
-      Value right = pop(&vm->stack, 1); 
-      Value left = pop(&vm->stack, 1); 
-
-      mpf_t result; 
-      
-      mpf_init(result); 
-
-      mpf_add(result, left.content.number, right.content.number); 
-
-      push(&vm->stack, NUMBER(result)); 
+      BINARY_OPERATION(mpf_add);
 
       COMPUTE_NEXT();
     }
@@ -275,11 +267,11 @@ static Results run(VM* vm) {
       
     mpf_init(result); 
 
-    unsigned long exponent = (unsigned long)(mpf_get_d(right.content.number));
+    unsigned long exponent = (unsigned long)(mpf_get_d(AS_NUMBER(right)));
 
-    mpf_pow_ui(result, left.content.number, exponent);
+    mpf_pow_ui(result, AS_NUMBER(left), exponent);
 
-    push(&vm->stack, NUMBER(result)); 
+    push(&vm->stack, NUMBER(vm, result)); 
 
     COMPUTE_NEXT();
 

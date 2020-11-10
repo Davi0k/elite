@@ -21,6 +21,24 @@ static Object* allocate_object(VM* vm, size_t size, Objects type) {
   return object;
 }
 
+Number* new_number(VM* vm, mpf_t value) {
+  Number* number = ALLOCATE_OBJECT(vm, Number, OBJECT_NUMBER);
+  mpf_init_set(number->content, value);
+  return number;
+}
+
+Number* number_from_double(VM* vm, double value) {
+  Number* number = ALLOCATE_OBJECT(vm, Number, OBJECT_NUMBER);
+  mpf_init_set_d(number->content, value);
+  return number;
+}
+
+Number* number_from_string(VM* vm, const char* value) {
+  Number* number = ALLOCATE_OBJECT(vm, Number, OBJECT_NUMBER);
+  mpf_init_set_str(number->content, value, 10);
+  return number;
+}
+
 String* allocate_string(VM* vm, const char* content, int length, uint32_t hash) {
   String* string = ALLOCATE_OBJECT(vm, String, OBJECT_STRING);
   string->content = (char*)content;
@@ -79,11 +97,9 @@ Native* new_native(VM* vm, Internal internal) {
 
 void print_object(Value value) {
   switch (OBJECT_TYPE(value)) {
-    case OBJECT_STRING: {
-      printf("%s", AS_STRING(value)->content);
-      
-      break;
-    }
+    case OBJECT_NUMBER: gmp_printf("%.Ff", AS_NUMBER(value)); break;
+
+    case OBJECT_STRING: printf("%s", AS_STRING(value)->content); break;
 
     case OBJECT_FUNCTION: {
       Function* function = AS_FUNCTION(value);
@@ -95,10 +111,6 @@ void print_object(Value value) {
       break;
     }
 
-    case OBJECT_NATIVE: {
-      printf("<Native Function>");
-
-      break;
-    }
+    case OBJECT_NATIVE: printf("<Native Function>"); break;
   }
 }

@@ -221,11 +221,9 @@ static void number(Parser* parser, bool assign) {
 
   string[parser->previous.length] = '\0';
 
-  Value value;
+  Number* number = number_from_string(parser->vm, string);
 
-  value.type = VALUE_NUMBER;
-
-  mpf_init_set_str(value.content.number, string, 10);
+  Value value = OBJECT(number);
 
   constant(parser, value);
 }
@@ -448,7 +446,7 @@ static void variable(Parser* parser, bool assign) {
     emit(parser, GET);
     emit(parser, argument);
 
-    constant(parser, MPF_NEUTRAL);
+    constant(parser, GMP_NEUTRAL(parser->vm));
 
     emit(parser, OP_ADD);
     operation = ASSIGN;
@@ -457,7 +455,7 @@ static void variable(Parser* parser, bool assign) {
     emit(parser, GET);
     emit(parser, argument);
 
-    constant(parser, MPF_NEUTRAL);
+    constant(parser, GMP_NEUTRAL(parser->vm));
 
     emit(parser, OP_SUBTRACT);
     operation = ASSIGN;

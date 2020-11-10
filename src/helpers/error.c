@@ -32,6 +32,7 @@ const char* run_time[] = {
   "A Stack Overflow error has occured.",
   "Can only call functions and classes.",
   "Operand must be a Number",
+  "Operand must be a Number or a String",
   "Operands must be Numbers.",
   "Operands must be two Numbers or two Strings.",
   "Undefined variable '%s'.",
