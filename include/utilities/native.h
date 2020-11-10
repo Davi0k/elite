@@ -3,8 +3,19 @@
 
 #include "common.h"
 #include "utilities/table.h"
-#include "types/object.h"
+#include "types/value.h"
 
-void natives(VM* vm);
+typedef struct {
+  bool error;
+  char message[LINE_LENGTH_MAX];
+} Handler;
+
+typedef Value (*Internal)(Value* arguments, int count, Handler* handler);
+
+void set_handler(Handler* handler);
+
+Value stopwatch(Value* arguments, int count, Handler* handler);
+
+Value print(Value* arguments, int count, Handler* handler);
 
 #endif

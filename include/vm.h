@@ -4,6 +4,7 @@
 #include "common.h"
 #include "utilities/chunk.h"
 #include "utilities/table.h"
+#include "utilities/native.h"
 #include "helpers/stack.h"
 #include "types/value.h"
 
@@ -33,12 +34,12 @@ typedef struct {
 
 void reset_stack(VM* vm);
 
+void native(VM* vm, const char* identifier, Internal internal);
+
 void initialize_VM(VM* vm);
 void free_VM(VM* vm);
 
 Results interpret(VM* vm, const char* source);
-
-extern void natives(VM* vm);
 
 extern Function* compile(VM* vm, const char* source);
 

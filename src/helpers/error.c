@@ -35,4 +35,5 @@ const char* run_time[] = {
   "Operands must be Numbers.",
   "Operands must be two Numbers or two Strings.",
   "Undefined variable '%s'.",
+  "Undefined Error Message."
 };

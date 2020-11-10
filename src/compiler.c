@@ -128,8 +128,6 @@ Rule rules[] = {
   [ TOKEN_DECREMENT ] = { NULL, NULL, PRECEDENCE_NONE },
 
   [ TOKEN_SET ] = { NULL, NULL, PRECEDENCE_NONE },
-
-  [ TOKEN_PRINT ] = { NULL, NULL, PRECEDENCE_NONE },
   
   [ TOKEN_IF ] = { NULL, NULL, PRECEDENCE_NONE },
   [ TOKEN_ELSE ] = { NULL, NULL, PRECEDENCE_NONE },
@@ -318,7 +316,6 @@ static void synchronize(Parser* parser) {
       case TOKEN_FOR:
       case TOKEN_IF:
       case TOKEN_WHILE:
-      case TOKEN_PRINT:
       case TOKEN_RETURN:
         return;
     }
@@ -744,11 +741,6 @@ static void statement(Parser* parser) {
     begin(parser);
     block(parser);
     end(parser);
-  } 
-  else if (match(parser, TOKEN_PRINT)) {
-    expression(parser);
-    emit(parser, OP_PRINT);
-    consume(parser, TOKEN_SEMICOLON, compile_time[EXPECT_SEMICOLON]);
   } 
   else if (match(parser, TOKEN_IF)) 
     conditional(parser);

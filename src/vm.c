@@ -10,6 +10,21 @@
 #include "common.h"
 #include "vm.h"
 
+void reset_stack(VM* vm) {
+  vm->stack.top = vm->stack.content;
+
+  vm->count = 0;
+}
+
+void native(VM* vm, const char* identifier, Internal internal) {
+  push(&vm->stack, OBJECT(copy_string(vm, identifier, (int)strlen(identifier))));
+  push(&vm->stack, OBJECT(new_native(vm, internal)));
+
+  table_set(&vm->globals, AS_STRING(vm->stack.content[0]), vm->stack.content[1]);
+
+  pop(&vm->stack, 2);
+}
+
 void initialize_VM(VM* vm) {
   reset_stack(vm);
 
@@ -18,7 +33,8 @@ void initialize_VM(VM* vm) {
   initialize_table(&vm->strings);
   initialize_table(&vm->globals);
 
-  natives(vm);
+  native(vm, "stopwatch", stopwatch);
+  native(vm, "print", print);
 }
 
 void free_VM(VM* vm) {
@@ -32,12 +48,6 @@ void free_VM(VM* vm) {
 
   free_table(&vm->strings); 
   free_table(&vm->globals); 
-}
-
-void reset_stack(VM* vm) {
-  vm->stack.top = vm->stack.content;
-
-  vm->count = 0;
 }
 
 static bool falsey(Value value) {
@@ -101,15 +111,22 @@ static bool call(VM* vm, Value value, int count) {
         return invoke(vm, AS_FUNCTION(value), count);
 
       case OBJECT_NATIVE: {
+        Handler handler;
+
+        set_handler(&handler);
+
         Internal internal = AS_NATIVE(value);
 
-        Value result = internal(count, vm->stack.top - count);
+        Value result = internal(vm->stack.top - count, count, &handler);
 
         vm->stack.top -= count + 1;
 
         push(&vm->stack, result);
 
-        return true;
+        if (handler.error == true)
+          error(vm, handler.message);
+        
+        return !handler.error;
       }
     }
   }
@@ -286,11 +303,6 @@ static Results run(VM* vm) {
   OP_GREATER: BINARY_COMPARISON(>); COMPUTE_NEXT();
 
   OP_LESS: BINARY_COMPARISON(<); COMPUTE_NEXT();
-
-  OP_PRINT:
-    print_value(pop(&vm->stack, 1));
-    printf("\n");
-    COMPUTE_NEXT();
 
   OP_GLOBAL_INITIALIZE: {
     String* identifier = AS_STRING(READ_CONSTANT());

@@ -7,8 +7,6 @@
 #include "common.h"
 #include "vm.h"
 
-#define MAX_CHARACTERS 2048
-
 static char* read(const char* path) {
   FILE* file = fopen(path, "rb");
 
@@ -43,7 +41,7 @@ static char* read(const char* path) {
 }
 
 static void repl(VM* vm) {
-  char line[MAX_CHARACTERS];
+  char line[LINE_LENGTH_MAX];
 
   while(true) {
     printf("> ");

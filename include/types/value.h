@@ -53,6 +53,8 @@ Value NUMBER(mpf_t number);
 
 Value NUMBER_FROM_VALUE(double number);
 
+Value NUMBER_FROM_STRING(const char* number);
+
 void initialize_constants(Constants* constants);
 void free_constants(Constants* constants);
 void write_constants(Constants* constants, Value value);

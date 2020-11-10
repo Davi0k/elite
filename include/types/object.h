@@ -3,6 +3,7 @@
 
 #include "common.h"
 #include "vm.h"
+#include "utilities/native.h"
 #include "utilities/chunk.h"
 #include "types/value.h"
 
@@ -14,11 +15,8 @@
 
 #define AS_STRING(value) ( (String*)AS_OBJECT(value) )
 #define AS_FUNCTION(value) ( (Function*)AS_OBJECT(value) )
-
 #define AS_NATIVE(value) \
   ( ( (Native*)AS_OBJECT(value) )->internal )
-
-typedef Value (*Internal)(int count, Value* arguments);
 
 typedef enum {
   OBJECT_STRING,

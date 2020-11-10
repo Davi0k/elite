@@ -3,24 +3,38 @@
 #include <time.h>
 
 #include "utilities/native.h"
+#include "helpers/error.h"
 
-static Value time_native(int count, Value* arguments) {
-  double seconds = (double)clock() / CLOCKS_PER_SEC;
+void set_handler(Handler* handler) {
+  handler->error = false;
 
-  Value number = NUMBER_FROM_VALUE(seconds);
-
-  return number;
+  strncpy(handler->message, run_time[UNDEFINED_ERROR], LINE_LENGTH_MAX);
 }
 
-static void define(VM* vm, const char* identifier, Internal internal) {
-  push(&vm->stack, OBJECT(copy_string(vm, identifier, (int)strlen(identifier))));
-  push(&vm->stack, OBJECT(new_native(vm, internal)));
+Value stopwatch(Value* arguments, int count, Handler* handler) {
+  if (count == 0) {
+    double seconds = (double)clock() / CLOCKS_PER_SEC;
 
-  table_set(&vm->globals, AS_STRING(vm->stack.content[0]), vm->stack.content[1]);
+    Value number = NUMBER_FROM_VALUE(seconds);
 
-  pop(&vm->stack, 2);
+    return number;
+  } 
+
+  handler->error = true;
+
+  sprintf(handler->message, run_time[EXPECT_ARGUMENTS_NUMBER], 0, count);
+  
+  return UNDEFINED;
 }
 
-void natives(VM* vm) {
-  define(vm, "time", time_native);
+Value print(Value* arguments, int count, Handler* handler) {
+  for (int i = 0; i < count; i++) {
+    Value value = arguments[i];
+
+    print_value(value);
+
+    printf("\n");
+  }
+  
+  return UNDEFINED;
 }

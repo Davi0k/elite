@@ -86,7 +86,6 @@ int disassemble_instruction(Chunk* chunk, int offset) {
     case OP_EQUAL:
     case OP_GREATER:
     case OP_LESS:
-    case OP_PRINT:
     case OP_POP:
     case OP_POP_N:
     case OP_RETURN:

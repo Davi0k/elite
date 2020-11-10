@@ -17,6 +17,8 @@
 
 #define STACK_MAX ( FRAMES_MAX * (UINT8_MAX + 1) )
 
+#define LINE_LENGTH_MAX 1024
+
 extern const char* compile_time[];
 
 extern const char* run_time[];

@@ -157,7 +157,6 @@ static Types trie(Tokenizer* tokenizer) {
     case 'i': return keyword(tokenizer, 1, 1, "f", TOKEN_IF);
     case 'n': return keyword(tokenizer, 1, 2, "ot", TOKEN_NOT);
     case 'o': return keyword(tokenizer, 1, 1, "r", TOKEN_OR);
-    case 'p': return keyword(tokenizer, 1, 4, "rint", TOKEN_PRINT);
     case 'r': return keyword(tokenizer, 1, 5, "eturn", TOKEN_RETURN);
     case 's': return keyword(tokenizer, 1, 2, "et", TOKEN_SET);
     case 't': return keyword(tokenizer, 1, 3, "rue", TOKEN_TRUE);
