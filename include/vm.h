@@ -15,7 +15,7 @@ typedef enum {
 } Results;
 
 typedef struct {
-  Function* function;
+  Closure* closure;
   uint8_t* ip;
   Value* slots;
 } Frame;

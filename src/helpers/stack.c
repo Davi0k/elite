@@ -6,8 +6,8 @@ void push(Stack* stack, Value value) {
   stack->top++;
 }
 
-Value pop(Stack* stack, int distance) {
-  stack->top = stack->top - distance;
+Value pop(Stack* stack, int count) {
+  stack->top = stack->top - count;
 
   return *stack->top;
 }

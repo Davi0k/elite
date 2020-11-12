@@ -335,7 +335,7 @@ static uint8_t identifier(Parser* parser, Token* token) {
 }
 
 static void local(Parser* parser, Token identifier) {
-  if (parser->compiler->count == UINT8_MAX + 1) {
+  if (parser->compiler->count == UINT8_COUNT) {
     error(parser, parser->previous, compile_time[TOO_MANY_LOCALS]);
     return;
   }
@@ -345,9 +345,9 @@ static void local(Parser* parser, Token identifier) {
   local->depth = INITIALIZE;
 }
 
-static int resolve(Parser* parser, Token* identifier) {
-  for (int i = parser->compiler->count - 1; i >= 0; i--) {
-    Local* local = &parser->compiler->locals[i];
+static int resolve(Parser* parser, Compiler* compiler, Token* identifier) {
+  for (int i = compiler->count - 1; i >= 0; i--) {
+    Local* local = &compiler->locals[i];
     
     if (identifiers_equality(identifier, &local->identifier)) {
       if (local->depth == INITIALIZE)
@@ -356,6 +356,43 @@ static int resolve(Parser* parser, Token* identifier) {
       return i;
     }
   }
+
+  return INITIALIZE;
+}
+
+static int up(Parser* parser, Compiler* compiler, uint8_t index, bool local) {
+  int count = compiler->function->count;
+
+  for (int i = 0; i < count; i++) {
+    Up* up = &compiler->ups[i];
+
+    if (up->index == index && up->local == local)
+      return i;
+  }
+
+  if (count == UINT8_COUNT) {
+    error(parser, parser->previous, compile_time[TOO_MANY_CLOSURE_VARIABLES]);
+    return 0;
+  }
+
+  compiler->ups[count].local = local;
+  compiler->ups[count].index = index;
+
+  return compiler->function->count++;
+}
+
+static int upvalue(Parser* parser, Compiler* compiler, Token* identifier) {
+  if (compiler->enclosing == NULL) return INITIALIZE;
+
+  int local = resolve(parser, compiler->enclosing, identifier);
+
+  if (local != INITIALIZE)
+    return up(parser, compiler, (uint8_t)local, true);
+
+  int over = upvalue(parser, compiler->enclosing, identifier);
+
+  if (over != INITIALIZE)
+    return up(parser, compiler, (uint8_t)over, false);
 
   return INITIALIZE;
 }
@@ -422,25 +459,28 @@ static void end(Parser* parser) {
 }
 
 static void variable(Parser* parser, bool assign) {
-  uint8_t GET, ASSIGN;
+  uint8_t SET, GET;
 
-  int argument = resolve(parser, &parser->previous);
+  int argument = resolve(parser, parser->compiler, &parser->previous);
 
   if (argument >= 0) {
+    SET = OP_LOCAL_SET;
     GET = OP_LOCAL_GET;
-    ASSIGN = OP_LOCAL_SET;
+  } else if((argument = upvalue(parser, parser->compiler, &parser->previous)) != INITIALIZE) {
+    SET = OP_UP_SET;
+    GET = OP_UP_GET;
   } else {
     argument = identifier(parser, &parser->previous);
 
+    SET = OP_GLOBAL_SET;
     GET = OP_GLOBAL_GET;
-    ASSIGN = OP_GLOBAL_SET;
   }
 
   uint8_t operation;
 
   if (assign && match(parser, TOKEN_ASSIGN)) {
     expression(parser);
-    operation = ASSIGN;
+    operation = SET;
   }
   else if (assign && match(parser, TOKEN_INCREMENT)) {
     emit(parser, GET);
@@ -449,7 +489,7 @@ static void variable(Parser* parser, bool assign) {
     constant(parser, GMP_NEUTRAL(parser->vm));
 
     emit(parser, OP_ADD);
-    operation = ASSIGN;
+    operation = SET;
   }
   else if (assign && match(parser, TOKEN_DECREMENT)) {
     emit(parser, GET);
@@ -458,7 +498,7 @@ static void variable(Parser* parser, bool assign) {
     constant(parser, GMP_NEUTRAL(parser->vm));
 
     emit(parser, OP_SUBTRACT);
-    operation = ASSIGN;
+    operation = SET;
   }
   else operation = GET;
 
@@ -496,8 +536,12 @@ static void function(Parser* parser, Positions position) {
 
   Function* function = terminate_compiler(parser);
 
-  emit(parser, OP_CONSTANT);
-  emit(parser, make(parser, OBJECT(function)));
+  stream(parser, 2, OP_CLOSURE, make(parser, OBJECT(function)));
+
+  for (int i = 0; i < function->count; i++) {
+    emit(parser, compiler.ups[i].local ? 1 : 0);
+    emit(parser, compiler.ups[i].index);
+  }
 }
 
 static int jump(Parser* parser, uint8_t instruction) {
@@ -812,6 +856,8 @@ Function* compile(VM* vm, const char* source) {
   Parser parser; 
 
   parser.vm = vm;
+
+  parser.compiler = NULL;
 
   parser.error = false; parser.panic = false;
 

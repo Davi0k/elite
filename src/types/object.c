@@ -21,6 +21,12 @@ static Object* allocate_object(VM* vm, size_t size, Objects type) {
   return object;
 }
 
+Upvalue* new_upvalue(VM* vm, Value* location) {
+  Upvalue* upvalue = ALLOCATE_OBJECT(vm, Upvalue, OBJECT_UPVALUE);
+  upvalue->location = location;
+  return upvalue;
+}
+
 Number* new_number(VM* vm, mpf_t value) {
   Number* number = ALLOCATE_OBJECT(vm, Number, OBJECT_NUMBER);
   mpf_init_set(number->content, value);
@@ -82,11 +88,28 @@ Function* new_function(VM* vm) {
   Function* function = ALLOCATE_OBJECT(vm, Function, OBJECT_FUNCTION);
 
   function->arity = 0;
+  function->count = 0;
   function->identifier = NULL;
 
   initialize_chunk(&function->chunk);
 
   return function;
+}
+
+Closure* new_closure(VM* vm, Function* function) {
+  int count = function->count;
+
+  Upvalue** upvalues = ALLOCATE(Upvalue*, count);
+
+  for (int i = 0; i < count; i++)
+    upvalues[i] = NULL;
+
+  Closure* closure = ALLOCATE_OBJECT(vm, Closure, OBJECT_CLOSURE);
+  closure->function = function;
+  closure->upvalues = upvalues;
+  closure->count = count;
+
+  return closure;
 }
 
 Native* new_native(VM* vm, Internal internal) {
@@ -97,6 +120,8 @@ Native* new_native(VM* vm, Internal internal) {
 
 void print_object(Value value) {
   switch (OBJECT_TYPE(value)) {
+    case OBJECT_UPVALUE: printf("upvalue"); break;
+
     case OBJECT_NUMBER: gmp_printf("%.Ff", AS_NUMBER(value)); break;
 
     case OBJECT_STRING: printf("%s", AS_STRING(value)->content); break;
@@ -110,6 +135,8 @@ void print_object(Value value) {
 
       break;
     }
+
+    case OBJECT_CLOSURE: printf("<Closure Function %s>", AS_CLOSURE(value)->function->identifier->content); break;
 
     case OBJECT_NATIVE: printf("<Native Function>"); break;
   }

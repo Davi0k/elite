@@ -7,14 +7,14 @@
 #include "helpers/error.h"
 #include "types/object.h"
 
-static Value error(Handler* handler, const char* message, ...) {
+static Value error(Handler* handler, const char* message, int count, ...) {
   va_list list;
 
-  va_start(list, message);
+  va_start(list, count);
 
-  handler->error = false;
+  handler->error = true;
 
-  vfprintf(stdout, message, list);
+  vsprintf(handler->message, message, list);
 
   va_end(list);
 
@@ -36,7 +36,7 @@ Value stopwatch_native(int count, Value* arguments, Handler* handler) {
     return NUMBER_FROM_DOUBLE(handler->vm, seconds);
   } 
 
-  return error(handler, run_time[EXPECT_ARGUMENTS_NUMBER], 0, count);
+  return error(handler, run_time[EXPECT_ARGUMENTS_NUMBER], 2, 0, count);
 }
 
 Value number_native(int count, Value* arguments, Handler* handler) {
@@ -52,10 +52,10 @@ Value number_native(int count, Value* arguments, Handler* handler) {
     if (IS_STRING(argument))
       return NUMBER_FROM_STRING(handler->vm, AS_STRING(argument)->content);
 
-    return error(handler, run_time[MUST_BE_NUMBER_OR_STRING]);
+    return error(handler, run_time[MUST_BE_NUMBER_OR_STRING], 0);
   }
 
-  return error(handler, run_time[EXPECT_ARGUMENTS_NUMBER], 1, count);
+  return error(handler, run_time[EXPECT_ARGUMENTS_NUMBER], 2, 1, count);
 }
 
 Value print_native(int count, Value* arguments, Handler* handler) {

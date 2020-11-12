@@ -31,6 +31,11 @@ typedef struct {
   int depth;
 } Local;
 
+typedef struct {
+  uint8_t index;
+  bool local;
+} Up;
+
 typedef struct Compiler {
   struct Compiler* enclosing;
 
@@ -38,9 +43,11 @@ typedef struct Compiler {
 
   Positions position;
 
-  Local locals[UINT8_MAX + 1];
+  Local locals[UINT8_COUNT];
   int count;
   int scope;
+
+  Up ups[UINT8_COUNT];
 } Compiler;
 
 typedef struct {

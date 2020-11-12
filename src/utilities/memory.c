@@ -17,6 +17,11 @@ void* reallocate(void* pointer, size_t oldest, size_t newest) {
 
 void free_object(Object* object) {
   switch (object->type) {
+    case OBJECT_UPVALUE: {
+      FREE(Upvalue, object);
+      break;
+    }
+
     case OBJECT_NUMBER: {
       Number* number = (Number*)object;
       mpf_clear(number->content);
@@ -35,6 +40,13 @@ void free_object(Object* object) {
       Function* function = (Function*)object;
       free_chunk(&function->chunk);
       FREE(Function, object);
+      break;
+    }
+
+    case OBJECT_CLOSURE: {
+      Closure* closure = (Closure*)object;
+      FREE_ARRAY(Upvalue*, closure->upvalues, closure->count);
+      FREE(Closure, object);
       break;
     }
 

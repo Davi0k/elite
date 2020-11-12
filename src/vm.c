@@ -2,7 +2,6 @@
 #include <stdarg.h>
 #include <string.h>
 
-#include "helpers/debug.h"
 #include "helpers/stack.h"
 #include "helpers/error.h"
 #include "utilities/memory.h"
@@ -71,7 +70,7 @@ static void error(VM* vm, const char* message, ...) {
   for (int i = vm->count - 1; i >= 0; i--) {
     Frame* frame = &vm->frames[i];
 
-    Function* function = frame->function;
+    Function* function = frame->closure->function;
 
     size_t instruction = frame->ip - function->chunk.code - 1;
 
@@ -85,9 +84,9 @@ static void error(VM* vm, const char* message, ...) {
   reset_stack(vm);
 }
 
-static bool invoke(VM* vm, Function* function, int count) {
-  if (count != function->arity) {
-    error(vm,  run_time[EXPECT_ARGUMENTS_NUMBER], function->arity, count);
+static bool invoke(VM* vm, Closure* closure, int count) {
+  if (count != closure->function->arity) {
+    error(vm,  run_time[EXPECT_ARGUMENTS_NUMBER], closure->function->arity, count);
     return false;
   }
 
@@ -97,8 +96,8 @@ static bool invoke(VM* vm, Function* function, int count) {
   }
 
   Frame* frame = &vm->frames[vm->count++];
-  frame->function = function;
-  frame->ip = function->chunk.code;
+  frame->closure = closure;
+  frame->ip = closure->function->chunk.code;
 
   frame->slots = vm->stack.top - count - 1;
 
@@ -108,8 +107,8 @@ static bool invoke(VM* vm, Function* function, int count) {
 static bool call(VM* vm, Value value, int count) {
   if (IS_OBJECT(value)) {
     switch (OBJECT_TYPE(value)) {
-      case OBJECT_FUNCTION:
-        return invoke(vm, AS_FUNCTION(value), count);
+      case OBJECT_CLOSURE:
+        return invoke(vm, AS_CLOSURE(value), count);
 
       case OBJECT_NATIVE: {
         Handler handler;
@@ -135,6 +134,11 @@ static bool call(VM* vm, Value value, int count) {
   error(vm, run_time[CANNOT_CALL]);
 }
 
+static Upvalue* capture(VM* vm, Value* local) {
+  Upvalue* upvalue = new_upvalue(vm, local);
+  return upvalue;
+}
+
 static Results run(VM* vm) {
   Frame* frame = &vm->frames[vm->count - 1];
 
@@ -142,7 +146,7 @@ static Results run(VM* vm) {
 
   #define READ_SHORT() ( frame->ip += 2, (uint16_t)((frame->ip[-2] << 8) | frame->ip[-1]) )
 
-  #define READ_CONSTANT() ( frame->function->chunk.constants.values[READ_BYTE()] )
+  #define READ_CONSTANT() ( frame->closure->function->chunk.constants.values[READ_BYTE()] )
 
   #define COMPUTE_NEXT() goto *jump_table[READ_BYTE()]
 
@@ -343,6 +347,18 @@ static Results run(VM* vm) {
     COMPUTE_NEXT();
   }
 
+  OP_UP_SET: {
+    uint8_t slot = READ_BYTE();
+    *frame->closure->upvalues[slot]->location = peek(&vm->stack, 0);
+    COMPUTE_NEXT();
+  }
+
+  OP_UP_GET: {
+    uint8_t slot = READ_BYTE();
+    push(&vm->stack, *frame->closure->upvalues[slot]->location);
+    COMPUTE_NEXT();
+  }
+
   OP_LOOP: {
     uint16_t offset = READ_SHORT();
 
@@ -423,6 +439,25 @@ static Results run(VM* vm) {
     COMPUTE_NEXT();
   }
 
+  OP_CLOSURE: {
+    Function* function = AS_FUNCTION(READ_CONSTANT());
+    
+    Closure* closure = new_closure(vm, function);
+
+    push(&vm->stack, OBJECT(closure));
+
+    for (int i = 0; i < closure->count; i++) {
+      uint8_t local = READ_BYTE();
+      uint8_t index = READ_BYTE();
+
+      if (local)
+        closure->upvalues[i] = capture(vm, frame->slots + index);
+      else closure->upvalues[i] = frame->closure->upvalues[index];
+    }
+
+    COMPUTE_NEXT();
+  }
+
   OP_EMPTY: COMPUTE_NEXT();
 
   OP_EXIT: return INTERPRET_OK;
@@ -442,7 +477,14 @@ Results interpret(VM* vm, const char* source) {
 
   push(&vm->stack, OBJECT(function));
 
-  call(vm, OBJECT(function), 0);
+  Closure* closure = new_closure(vm, function);
+
+  Value value = OBJECT(closure);
+
+  pop(&vm->stack, 1);
+  push(&vm->stack, value);
+
+  call(vm, value, 0);
 
   return run(vm);
 }

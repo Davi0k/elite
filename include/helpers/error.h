@@ -1,3 +1,4 @@
+
 #ifndef ERROR_H
 #define ERROR_H
 
@@ -26,6 +27,7 @@ typedef enum {
   EXPECT_WHILE_STATEMENT,
   EXPECT_OPEN_FOR,
   EXPECT_CLOSE_FOR,
+  TOO_MANY_CLOSURE_VARIABLES
 } COMPILE_TIME_ERRORS;
 
 typedef enum {

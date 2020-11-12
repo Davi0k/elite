@@ -2,6 +2,7 @@
 
 #include "helpers/debug.h"
 #include "utilities/chunk.h"
+#include "types/object.h"
 #include "types/value.h"
 #include "tokenizer.h"
 
@@ -63,6 +64,8 @@ int disassemble_instruction(Chunk* chunk, int offset) {
 
     case OP_LOCAL_SET:
     case OP_LOCAL_GET:
+    case OP_UP_SET:
+    case OP_UP_GET:
     case OP_CALL:
       return byte_representation(strings[instruction], chunk, offset);
 
@@ -91,6 +94,26 @@ int disassemble_instruction(Chunk* chunk, int offset) {
     case OP_RETURN:
     case OP_EXIT:
       return simple_representation(strings[instruction], offset);
+
+    case OP_CLOSURE: {
+      offset++;
+      
+      uint8_t constant = chunk->code[offset++];
+
+      printf("%-16s %4d ", strings[instruction], constant);
+      print_value(chunk->constants.values[constant]);
+      printf("\n");
+
+      Function* function = AS_FUNCTION(chunk->constants.values[constant]);
+
+      for (int i = 0; i < function->count; i++) {
+        int local = chunk->code[offset++];
+        int index = chunk->code[offset++];
+        printf("%04d      |                     %s %d\n", offset - 2, local ? "local" : "upvalue", index);
+      }
+
+      return offset;
+    }
 
     default:
       printf("Unknown Operation Code %d", instruction); printf("\n");

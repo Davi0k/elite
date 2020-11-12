@@ -13,9 +13,11 @@
 
 #define MAXIMUM_PRECISION 18
 
+#define UINT8_COUNT ( UINT8_MAX + 1 )
+
 #define FRAMES_MAX 128
 
-#define STACK_MAX ( FRAMES_MAX * (UINT8_MAX + 1) )
+#define STACK_MAX ( FRAMES_MAX * UINT8_COUNT )
 
 #define LINE_LENGTH_MAX 1024
 

@@ -4,9 +4,11 @@
 #include "common.h"
 
 typedef struct Object Object;
+typedef struct Upvalue Upvalue;
 typedef struct Number Number;
 typedef struct String String;
 typedef struct Function Function;
+typedef struct Closure Closure;
 typedef struct Native Native;
 
 #define BOOLEAN(value) ( (Value){ VALUE_BOOLEAN, { .boolean = value } } )
