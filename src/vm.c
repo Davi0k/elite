@@ -9,12 +9,6 @@
 #include "common.h"
 #include "vm.h"
 
-void reset_stack(VM* vm) {
-  vm->stack.top = vm->stack.content;
-
-  vm->count = 0;
-}
-
 void native(VM* vm, const char* identifier, Internal internal) {
   push(&vm->stack, OBJECT(copy_string(vm, identifier, (int)strlen(identifier))));
   push(&vm->stack, OBJECT(new_native(vm, internal)));
@@ -24,8 +18,15 @@ void native(VM* vm, const char* identifier, Internal internal) {
   pop(&vm->stack, 2);
 }
 
+void reset(VM* vm) {
+  vm->stack.top = vm->stack.content;
+
+  vm->count = 0;
+  vm->upvalues = NULL;
+}
+
 void initialize_VM(VM* vm) {
-  reset_stack(vm);
+  reset(vm);
 
   vm->objects = NULL;
 
@@ -81,7 +82,7 @@ static void error(VM* vm, const char* message, ...) {
     else fprintf(stderr, "'%s' Function\n", function->identifier->content);
   }
 
-  reset_stack(vm);
+  reset(vm);
 }
 
 static bool invoke(VM* vm, Closure* closure, int count) {
@@ -135,8 +136,36 @@ static bool call(VM* vm, Value value, int count) {
 }
 
 static Upvalue* capture(VM* vm, Value* local) {
-  Upvalue* upvalue = new_upvalue(vm, local);
-  return upvalue;
+  Upvalue* previous = NULL;
+
+  Upvalue* upvalue = vm->upvalues;
+
+  while (upvalue != NULL && upvalue->location > local) {
+    previous = upvalue;
+    upvalue = upvalue->next;
+  }
+
+  if (upvalue != NULL && upvalue->location == local)
+    return upvalue;
+
+  Upvalue* new = new_upvalue(vm, local);
+
+  new->next = upvalue;
+
+  if (previous == NULL)
+    vm->upvalues = new;
+  else previous->next = new;
+
+  return new;
+}
+
+static void close(VM* vm, Value* last) {
+  while (vm->upvalues != NULL && vm->upvalues->location >= last) {
+    Upvalue* upvalue = vm->upvalues;
+    upvalue->closed = *upvalue->location;
+    upvalue->location = &upvalue->closed;
+    vm->upvalues = upvalue->next;
+  }
 }
 
 static Results run(VM* vm) {
@@ -423,6 +452,8 @@ static Results run(VM* vm) {
   OP_RETURN: {
     Value result = pop(&vm->stack, 1);
 
+    close(vm, frame->slots);
+
     vm->count--;
 
     if (vm->count == 0) {
@@ -455,6 +486,12 @@ static Results run(VM* vm) {
       else closure->upvalues[i] = frame->closure->upvalues[index];
     }
 
+    COMPUTE_NEXT();
+  }
+
+  OP_CLOSE: {
+    close(vm, vm->stack.top - 1);
+    pop(&vm->stack, 1);
     COMPUTE_NEXT();
   }
 

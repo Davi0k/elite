@@ -27,14 +27,16 @@ typedef struct VM {
 
   Stack stack;
 
+  Upvalue* upvalues;
+
   Object* objects;
 
   Table strings, globals;
 } VM;
 
-void reset_stack(VM* vm);
-
 void native(VM* vm, const char* identifier, Internal internal);
+
+void reset(VM* vm);
 
 void initialize_VM(VM* vm);
 void free_VM(VM* vm);

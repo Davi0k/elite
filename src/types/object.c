@@ -24,6 +24,8 @@ static Object* allocate_object(VM* vm, size_t size, Objects type) {
 Upvalue* new_upvalue(VM* vm, Value* location) {
   Upvalue* upvalue = ALLOCATE_OBJECT(vm, Upvalue, OBJECT_UPVALUE);
   upvalue->location = location;
+  upvalue->closed = UNDEFINED;
+  upvalue->next = NULL;
   return upvalue;
 }
 

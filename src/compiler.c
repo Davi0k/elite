@@ -27,6 +27,7 @@ void set_compiler(Parser* parser, Compiler* compiler, Positions position) {
 
   Local* local = &parser->compiler->locals[parser->compiler->count++];
   local->depth = 0;
+  local->captured = false;
   local->identifier.start = NULL_TERMINATOR;
   local->identifier.length = 0;
 }
@@ -343,6 +344,7 @@ static void local(Parser* parser, Token identifier) {
   Local* local = &parser->compiler->locals[parser->compiler->count++];
   local->identifier = identifier;
   local->depth = INITIALIZE;
+  local->captured = false;
 }
 
 static int resolve(Parser* parser, Compiler* compiler, Token* identifier) {
@@ -386,8 +388,11 @@ static int upvalue(Parser* parser, Compiler* compiler, Token* identifier) {
 
   int local = resolve(parser, compiler->enclosing, identifier);
 
-  if (local != INITIALIZE)
+  if (local != INITIALIZE) {
+    compiler->enclosing->locals[local].captured = true;
+
     return up(parser, compiler, (uint8_t)local, true);
+  }
 
   int over = upvalue(parser, compiler->enclosing, identifier);
 
@@ -447,60 +452,73 @@ static void end(Parser* parser) {
 
   Compiler* compiler = parser->compiler;
 
-  int count = compiler->count;
+  int counter = 0;
 
-  while (count > 0 && compiler->locals[count - 1].depth > compiler->scope)
-    count--;
+  while (compiler->count > 0 && compiler->locals[compiler->count - 1].depth > compiler->scope) {
+    if (compiler->locals[compiler->count - 1].captured) {
+      emit(parser, OP_POP_N);
+      emit(parser, counter);
+
+      emit(parser, OP_CLOSE);
+
+      counter = 0;
+    }
+    else counter++;
+
+    compiler->count--;
+  }
 
   emit(parser, OP_POP_N);
-  emit(parser, compiler->count - count);
-
-  compiler->count = count;
+  emit(parser, counter);
 }
 
 static void variable(Parser* parser, bool assign) {
-  uint8_t SET, GET;
+  uint8_t setter, getter;
 
   int argument = resolve(parser, parser->compiler, &parser->previous);
 
   if (argument >= 0) {
-    SET = OP_LOCAL_SET;
-    GET = OP_LOCAL_GET;
-  } else if((argument = upvalue(parser, parser->compiler, &parser->previous)) != INITIALIZE) {
-    SET = OP_UP_SET;
-    GET = OP_UP_GET;
+    setter = OP_LOCAL_SET;
+    getter = OP_LOCAL_GET;
   } else {
-    argument = identifier(parser, &parser->previous);
+    argument = upvalue(parser, parser->compiler, &parser->previous);
 
-    SET = OP_GLOBAL_SET;
-    GET = OP_GLOBAL_GET;
+    if(argument != INITIALIZE) {
+      setter = OP_UP_SET;
+      getter = OP_UP_GET;
+    } else {
+      argument = identifier(parser, &parser->previous);
+
+      setter = OP_GLOBAL_SET;
+      getter = OP_GLOBAL_GET;
+    }
   }
 
   uint8_t operation;
 
   if (assign && match(parser, TOKEN_ASSIGN)) {
     expression(parser);
-    operation = SET;
+    operation = setter;
   }
   else if (assign && match(parser, TOKEN_INCREMENT)) {
-    emit(parser, GET);
+    emit(parser, getter);
     emit(parser, argument);
 
     constant(parser, GMP_NEUTRAL(parser->vm));
 
     emit(parser, OP_ADD);
-    operation = SET;
+    operation = setter;
   }
   else if (assign && match(parser, TOKEN_DECREMENT)) {
-    emit(parser, GET);
+    emit(parser, getter);
     emit(parser, argument);
 
     constant(parser, GMP_NEUTRAL(parser->vm));
 
     emit(parser, OP_SUBTRACT);
-    operation = SET;
+    operation = setter;
   }
-  else operation = GET;
+  else operation = getter;
 
   emit(parser, operation);
   emit(parser, argument);
