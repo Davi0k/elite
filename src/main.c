@@ -2,16 +2,32 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <time.h>
-
 #include "common.h"
 #include "vm.h"
+
+#define VERSION "1.0.0"
+
+typedef enum {
+  SYNTAX_ERROR,
+  NO_OPTIONAL_PARAMETER,
+  COULD_NOT_READ_FILE,
+  COULD_NOT_OPEN_FILE,
+  NOT_ENOUGH_MEMORY
+} COMMAND_LINE_INTERFACE_ERRORS;
+
+const char* errors[] = {
+  [SYNTAX_ERROR] = "Expected %d arguments but got %d.",
+  [NO_OPTIONAL_PARAMETER] = "A Stack Overflow error has occured.",
+  [COULD_NOT_READ_FILE] = "Can only call functions and classes.",
+  [COULD_NOT_OPEN_FILE] = "Could not open file <%s>.",
+  [NOT_ENOUGH_MEMORY] = "Operand must be a Number or a String."
+};
 
 static char* read(const char* path) {
   FILE* file = fopen(path, "rb");
 
   if (file == NULL) {
-    fprintf(stderr, "Could not open file <%s>.", path);
+    fprintf(stderr, errors[COULD_NOT_OPEN_FILE], path);
     exit(74);
   }
 
@@ -22,14 +38,14 @@ static char* read(const char* path) {
   char* buffer = (char*)malloc(size + 1);
 
   if (buffer == NULL) {
-    fprintf(stderr, "Not enough memory to read <%s>.", path);
+    fprintf(stderr, errors[NOT_ENOUGH_MEMORY], path);
     exit(74);
   }
 
   size_t bytes = fread(buffer, sizeof(char), size, file);
 
   if (bytes < size) {
-    fprintf(stderr, "Could not read file <%s>.", path);
+    fprintf(stderr, errors[COULD_NOT_READ_FILE], path);
     exit(74);
   }
 
@@ -55,7 +71,7 @@ static void repl(VM* vm) {
   }
 }
 
-static void execute_file(VM* vm, const char* path) {
+static void file(VM* vm, const char* path) {
   char* source = read(path);
 
   Results result = interpret(vm, source);
@@ -66,7 +82,6 @@ static void execute_file(VM* vm, const char* path) {
   if (result == INTERPRET_RUNTIME_ERROR) exit(70);
 }
 
-
 int main(int argc, const char* argv[]) {
   mpf_set_default_prec(GMP_MAX_PRECISION);
 
@@ -76,10 +91,25 @@ int main(int argc, const char* argv[]) {
 
   if (argc == 1) repl(&vm);
 
-  if (argc == 2) execute_file(&vm, argv[1]);
+  if (argc == 2)  {
+    const char* parameter = argv[1];
+
+    if (parameter[0] == '-') {
+      switch (parameter[1]) {
+        case 'v':
+          printf("Elite %s", VERSION);
+          break;
+
+        default:
+          fprintf(stderr, errors[NO_OPTIONAL_PARAMETER], parameter);
+          exit(64);
+      }
+    }
+    else file(&vm, argv[1]);
+  }
 
   if (argc != 1 && argc != 2) {
-    fprintf(stderr, "The correct Syntax is: elite [path].");
+    fprintf(stderr, errors[SYNTAX_ERROR]);
     exit(64);
   }
 

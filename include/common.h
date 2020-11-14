@@ -11,8 +11,6 @@
 
 #define GMP_MAX_PRECISION 100024
 
-#define MAXIMUM_PRECISION 18
-
 #define UINT8_COUNT ( UINT8_MAX + 1 )
 
 #define FRAMES_MAX 128
@@ -22,7 +20,7 @@
 #define LINE_LENGTH_MAX 1024
 
 extern const char* compile_time[];
-
 extern const char* run_time[];
+extern const char* command_line_interface[];
 
 #endif
