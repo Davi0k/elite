@@ -745,13 +745,8 @@ static void looping(Parser* parser) {
   consume(parser, TOKEN_OPEN_PARENTHESES, compile_time_errors[EXPECT_OPEN_FOR]);
 
   if (match(parser, TOKEN_SEMICOLON) == false) {
-    if (check(parser, TOKEN_GLOBAL) || check(parser, TOKEN_SET)) {
-      bool force = match(parser, TOKEN_GLOBAL);
-
-      consume(parser, TOKEN_SET, compile_time_errors[EXPECT_SET_OR_DEFINE]);
-
-      set(parser, force);
-    }
+    if (match(parser, TOKEN_SET))
+      set(parser, false);
     else {
       expression(parser);
       consume(parser, TOKEN_SEMICOLON, compile_time_errors[EXPECT_SEMICOLON]);
