@@ -8,6 +8,8 @@
 #include "helpers/stack.h"
 #include "types/value.h"
 
+#define FRAME_DEFAULT_SIZE 16
+
 typedef enum {
   INTERPRET_OK,
   INTERPRET_COMPILE_ERROR,
@@ -21,8 +23,8 @@ typedef struct {
 } Frame;
 
 typedef struct VM {
-  Frame frames[FRAMES_MAX];
-
+  Frame* frames;
+  int capacity;
   int count;
 
   Stack stack;

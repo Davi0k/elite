@@ -57,15 +57,14 @@ static char* read(const char* path) {
 }
 
 static void repl(VM* vm) {
-  char line[LINE_LENGTH_MAX];
+  char* line = NULL;
+
+  size_t size = 0;
 
   while(true) {
     printf("> ");
 
-    if (fgets(line, sizeof(line), stdin) == NULL) {
-      printf("\n");
-      break;
-    }
+    getline(&line, &size, stdin);
 
     interpret(vm, line);
   }

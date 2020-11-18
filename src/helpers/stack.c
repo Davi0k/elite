@@ -1,4 +1,5 @@
 #include "helpers/stack.h"
+#include "utilities/memory.h" 
 
 void push(Stack* stack, Value value) {
   *stack->top = value;

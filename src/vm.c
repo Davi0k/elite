@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
+#include <limits.h>
 
 #include "helpers/stack.h"
 #include "helpers/error.h"
@@ -19,16 +20,20 @@ void native(VM* vm, const char* identifier, Internal internal) {
 }
 
 void reset(VM* vm) {
-  vm->stack.top = vm->stack.content;
-
   vm->count = 0;
+  vm->capacity = FRAME_DEFAULT_SIZE;
+  vm->frames = GROW_ARRAY(Frame, vm->frames, 0 , vm->capacity);
+  
   vm->upvalues = NULL;
+
+  vm->stack.top = vm->stack.content;
 }
 
 void initialize_VM(VM* vm) {
-  reset(vm);
-
+  vm->frames = NULL;
   vm->objects = NULL;
+
+  reset(vm);
 
   initialize_table(&vm->strings);
   initialize_table(&vm->globals);
@@ -36,6 +41,7 @@ void initialize_VM(VM* vm) {
   native(vm, "stopwatch", stopwatch_native);
   native(vm, "number", number_native);
   native(vm, "print", print_native);
+  native(vm, "input", input_native);
 }
 
 void free_VM(VM* vm) {
@@ -49,6 +55,8 @@ void free_VM(VM* vm) {
 
   free_table(&vm->strings); 
   free_table(&vm->globals); 
+
+  FREE_ARRAY(Frame, vm->frames, vm->capacity);
 }
 
 static bool falsey(Value value) {
@@ -84,16 +92,25 @@ static void error(VM* vm, const char* message, ...) {
 
   reset(vm);
 }
+#include "helpers/debug.h"
 
 static bool invoke(VM* vm, Closure* closure, int count) {
   if (count != closure->function->arity) {
-    error(vm,  run_time[EXPECT_ARGUMENTS_NUMBER], closure->function->arity, count);
+    error(vm, run_time_errors[EXPECT_ARGUMENTS_NUMBER], closure->function->arity, count);
     return false;
   }
 
-  if (vm->count == FRAMES_MAX) {
-    error(vm, run_time[STACK_OVERFLOW]);
-    return false;
+  if (vm->capacity < vm->count + 1) {
+    if (GROW_CAPACITY(vm->capacity) > INT_MAX / (vm->capacity == 0 ? 1 : vm->capacity)) {
+      error(vm, run_time_errors[STACK_OVERFLOW]);
+      return false;
+    }
+
+    int capacity = vm->capacity;
+
+    vm->capacity = GROW_CAPACITY(capacity);
+
+    vm->frames = GROW_ARRAY(Frame, vm->frames, capacity, vm->capacity);
   }
 
   Frame* frame = &vm->frames[vm->count++];
@@ -132,7 +149,7 @@ static bool call(VM* vm, Value value, int count) {
     }
   }
 
-  error(vm, run_time[CANNOT_CALL]);
+  error(vm, run_time_errors[CANNOT_CALL]);
 }
 
 static Upvalue* capture(VM* vm, Value* local) {
@@ -182,14 +199,15 @@ static Results run(VM* vm) {
   #define BINARY_OPERATION(operator) \
     do { \
       if (!IS_NUMBER(peek(&vm->stack, 0)) || !IS_NUMBER(peek(&vm->stack, 1))) { \
-        error(vm, run_time[MUST_BE_NUMBERS]); \
+        error(vm, run_time_errors[MUST_BE_NUMBERS]); \
         return INTERPRET_RUNTIME_ERROR; \
       } \
       Value right = pop(&vm->stack, 1); \
       Value left = pop(&vm->stack, 1); \
       mpf_t result; mpf_init(result); \
-      operator(result, AS_NUMBER(left), AS_NUMBER(right)); \
+      operator(result, AS_NUMBER(left)->content, AS_NUMBER(right)->content); \
       push(&vm->stack, NUMBER(vm, result)); \
+      mpf_clear(result); \
     } while(false) 
 
   #define BINARY_COMPARISON(operator) \
@@ -197,7 +215,7 @@ static Results run(VM* vm) {
       if (IS_NUMBER(peek(&vm->stack, 0)) && IS_NUMBER(peek(&vm->stack, 1))) { \
         Value right = pop(&vm->stack, 1); \
         Value left = pop(&vm->stack, 1); \
-        bool comparison = mpf_cmp(AS_NUMBER(left), AS_NUMBER(right)) operator 0; \
+        bool comparison = mpf_cmp(AS_NUMBER(left)->content, AS_NUMBER(right)->content) operator 0; \
         push(&vm->stack, BOOLEAN(comparison)); \
         COMPUTE_NEXT(); \
       } \
@@ -209,7 +227,7 @@ static Results run(VM* vm) {
         push(&vm->stack, BOOLEAN(comparison)); \
         COMPUTE_NEXT(); \
       } \
-      error(vm, run_time[MUST_BE_NUMBERS_OR_STRINGS]); \
+      error(vm, run_time_errors[MUST_BE_NUMBERS_OR_STRINGS]); \
       return INTERPRET_RUNTIME_ERROR; \
     } while(false)
 
@@ -235,7 +253,7 @@ static Results run(VM* vm) {
 
   OP_NEGATION:
     if (!IS_NUMBER(peek(&vm->stack, 0))) {
-      error(vm, run_time[MUST_BE_NUMBER]);
+      error(vm, run_time_errors[MUST_BE_NUMBER]);
 
       return INTERPRET_RUNTIME_ERROR;
     }
@@ -244,9 +262,11 @@ static Results run(VM* vm) {
     
     mpf_init(number);
 
-    mpf_neg(number, AS_NUMBER(pop(&vm->stack, 1)));
+    mpf_neg(number, AS_NUMBER(pop(&vm->stack, 1))->content);
 
     push(&vm->stack, NUMBER(vm, number));
+
+    mpf_clear(number);
 
     COMPUTE_NEXT();
   
@@ -277,7 +297,7 @@ static Results run(VM* vm) {
       COMPUTE_NEXT();
     }
 
-    error(vm, run_time[MUST_BE_NUMBERS_OR_STRINGS]);
+    error(vm, run_time_errors[MUST_BE_NUMBERS_OR_STRINGS]);
 
     return INTERPRET_RUNTIME_ERROR;
 
@@ -289,7 +309,7 @@ static Results run(VM* vm) {
 
   OP_POWER: 
     if (!IS_NUMBER(peek(&vm->stack, 0)) || !IS_NUMBER(peek(&vm->stack, 1))) { 
-      error(vm, run_time[MUST_BE_NUMBER]); 
+      error(vm, run_time_errors[MUST_BE_NUMBER]); 
       return INTERPRET_RUNTIME_ERROR; 
     } 
 
@@ -300,11 +320,13 @@ static Results run(VM* vm) {
       
     mpf_init(result); 
 
-    unsigned long exponent = (unsigned long)(mpf_get_d(AS_NUMBER(right)));
+    unsigned long exponent = (unsigned long)(mpf_get_d(AS_NUMBER(right)->content));
 
-    mpf_pow_ui(result, AS_NUMBER(left), exponent);
+    mpf_pow_ui(result, AS_NUMBER(left)->content, exponent);
 
     push(&vm->stack, NUMBER(vm, result)); 
+
+    mpf_clear(result);
 
     COMPUTE_NEXT();
 
@@ -342,7 +364,7 @@ static Results run(VM* vm) {
 
     if (table_set(&vm->globals, identifier, peek(&vm->stack, 0))) {
       table_delete(&vm->globals, identifier);
-      error(vm, run_time[UNDEFINED_VARIABLE], identifier->content);
+      error(vm, run_time_errors[UNDEFINED_VARIABLE], identifier->content);
       return INTERPRET_RUNTIME_ERROR;
     }
 
@@ -355,7 +377,7 @@ static Results run(VM* vm) {
     Value value;
 
     if (table_get(&vm->globals, identifier, &value) == false) {
-      error(vm, run_time[UNDEFINED_VARIABLE], identifier->content);
+      error(vm, run_time_errors[UNDEFINED_VARIABLE], identifier->content);
       return INTERPRET_RUNTIME_ERROR;
     }
 
@@ -455,6 +477,14 @@ static Results run(VM* vm) {
     close(vm, frame->slots);
 
     vm->count--;
+
+    if (vm->capacity > FRAME_DEFAULT_SIZE && vm->count < vm->capacity / 2) {
+      int capacity = vm->capacity;
+
+      vm->capacity = vm->capacity / 2;
+
+      vm->frames = GROW_ARRAY(Frame, vm->frames, capacity, vm->capacity);
+    }
 
     if (vm->count == 0) {
       pop(&vm->stack, 1);

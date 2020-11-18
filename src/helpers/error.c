@@ -1,6 +1,6 @@
 #include "helpers/error.h"
 
-const char* compile_time[] = {
+const char* compile_time_errors[] = {
   [TOO_MANY_CONSTANTS] = "Too many Constants in one single Chunk.",
   [TOO_MANY_LOCALS] = "Too many local variables in Function.",
   [CANNOT_READ_INITIALIZER] = "Cannot read local variable in its own initializer.",
@@ -25,16 +25,19 @@ const char* compile_time[] = {
   [EXPECT_WHILE_STATEMENT] = "Expect 'while' statement after instructions.",
   [EXPECT_OPEN_FOR] = "Expect '(' before 'for' branch.",
   [EXPECT_CLOSE_FOR] = "Expect '(' after 'for' branch.",
-  [TOO_MANY_CLOSURE_VARIABLES] = "Too many closure variables in Function."
+  [TOO_MANY_CLOSURE_VARIABLES] = "Too many closure variables in Function.",
+  [EXPECT_SET_OR_DEFINE] = "Expect 'set' or 'define' statement after 'global' modifier."
 };
 
-const char* run_time[] = {
+const char* run_time_errors[] = {
   [EXPECT_ARGUMENTS_NUMBER] = "Expected %d arguments but got %d.",
   [STACK_OVERFLOW] = "A Stack Overflow error has occured.",
   [CANNOT_CALL] = "Can only call functions and classes.",
   [MUST_BE_NUMBER] = "Operand must be a Number.",
-  [MUST_BE_NUMBER_OR_STRING] = "Operand must be a Number or a String.",
   [MUST_BE_NUMBERS] = "Operands must be Numbers.",
+  [MUST_BE_STRING] = "Operand must be a String.",
+  [MUST_BE_STRINGS] = "Operands must be Strings.",
+  [MUST_BE_NUMBER_OR_STRING] = "Operand must be a Number or a String.",
   [MUST_BE_NUMBERS_OR_STRINGS] = "Operands must be two Numbers or two Strings.",
   [UNDEFINED_VARIABLE] = "Undefined variable '%s'.",
   [UNDEFINED_ERROR] = "Undefined Error Message."

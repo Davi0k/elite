@@ -7,9 +7,12 @@
 #include "utilities/chunk.h"
 #include "types/value.h"
 
-#define GMP_NEUTRAL(vm) ( OBJECT(number_from_double(vm, 1.0)) )
+#define GMP_NEUTRAL(vm) ( OBJECT(allocate_number_from_double(vm, 1.0)) )
 
 #define OBJECT_TYPE(value) ( AS_OBJECT(value)->type )
+
+#define NUMBER(vm, value) ( OBJECT(allocate_number(vm, value))  )
+#define STRING(vm, content, length) ( OBJECT(copy_string(vm, content, length)) )
 
 #define IS_NUMBER(value) validate(value, OBJECT_NUMBER)
 #define IS_STRING(value) validate(value, OBJECT_STRING)
@@ -17,16 +20,11 @@
 #define IS_CLOSURE(value) validate(value, OBJECT_CLOSURE)
 #define IS_NATIVE(value) validate(value, OBJECT_NATIVE)
 
-#define AS_NUMBER(value) ( ( (Number*)AS_OBJECT(value) )->content )
+#define AS_NUMBER(value) ( ( (Number*)AS_OBJECT(value) ) )
 #define AS_STRING(value) ( (String*)AS_OBJECT(value) )
 #define AS_FUNCTION(value) ( (Function*)AS_OBJECT(value) )
 #define AS_CLOSURE(value) ( (Closure*)AS_OBJECT(value) )
 #define AS_NATIVE(value) ( ( (Native*)AS_OBJECT(value) )->internal )
-
-#define NUMBER(vm, value) ( OBJECT(new_number(vm, value)) )
-
-#define NUMBER_FROM_DOUBLE(vm, value) ( OBJECT(number_from_double(vm, value)) )
-#define NUMBER_FROM_STRING(vm, value) ( OBJECT(number_from_string(vm, value)) )
 
 typedef enum {
   OBJECT_UPVALUE,
@@ -83,10 +81,10 @@ typedef struct Native {
 
 Upvalue* new_upvalue(VM* vm, Value* location);
 
-Number* new_number(VM* vm, mpf_t number);
+Number* allocate_number(VM* vm, mpf_t number);
 
-Number* number_from_double(VM* vm, double number);
-Number* number_from_string(VM* vm, const char* number);
+Number* allocate_number_from_double(VM* vm, double number);
+Number* allocate_number_from_string(VM* vm, const char* number);
 
 String* allocate_string(VM* vm, const char* content, int length, uint32_t hash);
 

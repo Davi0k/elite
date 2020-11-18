@@ -154,6 +154,7 @@ static Types trie(Tokenizer* tokenizer) {
 
       break;
 
+    case 'g': return keyword(tokenizer, 1, 5, "lobal", TOKEN_GLOBAL);
     case 'i': return keyword(tokenizer, 1, 1, "f", TOKEN_IF);
     case 'n': return keyword(tokenizer, 1, 2, "ot", TOKEN_NOT);
     case 'o': return keyword(tokenizer, 1, 1, "r", TOKEN_OR);

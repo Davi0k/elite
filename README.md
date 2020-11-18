@@ -65,9 +65,9 @@ The interpreter depends on some libraries and tools, make sure you have installe
 ## Using the CLI
 To run a script, use the following dedicated Command-Line Interface (**CLI**) syntax:
 ```
-.\elite.exe [path]
+.\elite.exe [path] [-v]
 ```
-If you want, you can use the REPL (Read Eval Print Loop) by running the **CLI** without any positional parameters. 
+If you want, you can use the `REPL` (Read Eval Print Loop) by running the **CLI** without any positional parameters. 
 
 ## Example script
 A simple Script to calculate the `factorial` and the corresponding number of the `fibonacci` series using recursive algorithms and measuring the execution time.

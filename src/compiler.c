@@ -129,6 +129,8 @@ Rule rules[] = {
   [ TOKEN_DECREMENT ] = { NULL, NULL, PRECEDENCE_NONE },
 
   [ TOKEN_SET ] = { NULL, NULL, PRECEDENCE_NONE },
+
+  [ TOKEN_GLOBAL ] = { NULL, NULL, PRECEDENCE_NONE },
   
   [ TOKEN_IF ] = { NULL, NULL, PRECEDENCE_NONE },
   [ TOKEN_ELSE ] = { NULL, NULL, PRECEDENCE_NONE },
@@ -201,7 +203,7 @@ static uint8_t make(Parser* parser, Value value) {
   int constant = add_constant(get_current_chunk(parser->compiler), value);
 
   if (constant > UINT8_MAX) {
-    error(parser, parser->previous, compile_time[TOO_MANY_CONSTANTS]);
+    error(parser, parser->previous, compile_time_errors[TOO_MANY_CONSTANTS]);
     return 0;
   }
 
@@ -222,7 +224,7 @@ static void number(Parser* parser, bool assign) {
 
   string[parser->previous.length] = '\0';
 
-  Number* number = number_from_string(parser->vm, string);
+  Number* number = allocate_number_from_string(parser->vm, string);
 
   Value value = OBJECT(number);
 
@@ -337,7 +339,7 @@ static uint8_t identifier(Parser* parser, Token* token) {
 
 static void local(Parser* parser, Token identifier) {
   if (parser->compiler->count == UINT8_COUNT) {
-    error(parser, parser->previous, compile_time[TOO_MANY_LOCALS]);
+    error(parser, parser->previous, compile_time_errors[TOO_MANY_LOCALS]);
     return;
   }
 
@@ -353,7 +355,7 @@ static int resolve(Parser* parser, Compiler* compiler, Token* identifier) {
     
     if (identifiers_equality(identifier, &local->identifier)) {
       if (local->depth == INITIALIZE)
-        error(parser, parser->previous, compile_time[CANNOT_READ_INITIALIZER]);
+        error(parser, parser->previous, compile_time_errors[CANNOT_READ_INITIALIZER]);
 
       return i;
     }
@@ -373,7 +375,7 @@ static int up(Parser* parser, Compiler* compiler, uint8_t index, bool local) {
   }
 
   if (count == UINT8_COUNT) {
-    error(parser, parser->previous, compile_time[TOO_MANY_CLOSURE_VARIABLES]);
+    error(parser, parser->previous, compile_time_errors[TOO_MANY_CLOSURE_VARIABLES]);
     return 0;
   }
 
@@ -402,22 +404,22 @@ static int upvalue(Parser* parser, Compiler* compiler, Token* identifier) {
   return INITIALIZE;
 }
 
-static void mark(Parser* parser) {
-  if (parser->compiler->scope == 0) return;
+static void mark(Parser* parser, bool force) {
+  if (force == true || parser->compiler->scope == 0) return;
 
   parser->compiler->locals[parser->compiler->count - 1].depth = parser->compiler->scope;
 }
 
-static void initialize(Parser* parser, uint8_t global) {
-  if (parser->compiler->scope == 0) {
+static void initialize(Parser* parser, uint8_t global, bool force) {
+  if (parser->compiler->scope == 0 || force == true) {
     emit(parser, OP_GLOBAL_INITIALIZE);
     emit(parser, global);
   }
-  else mark(parser);
+  else mark(parser, force);
 }
 
-static void declaration(Parser* parser) {
-  if (parser->compiler->scope == 0) return;
+static void declaration(Parser* parser, bool force) {
+  if (parser->compiler->scope == 0 || force == true) return;
 
   Token* identifier = &parser->previous;
 
@@ -427,20 +429,20 @@ static void declaration(Parser* parser) {
     if (local->depth != INITIALIZE && local->depth < parser->compiler->scope) break;
 
     if (identifiers_equality(identifier, &local->identifier))
-      error(parser, parser->previous, compile_time[VARIABLE_ALREADY_DECLARE]);
+      error(parser, parser->previous, compile_time_errors[VARIABLE_ALREADY_DECLARE]);
   }
 
   local(parser, *identifier);
 }
 
-static uint8_t definition(Parser* parser, const char* error) {
+static uint8_t definition(Parser* parser, const char* error, bool force) {
   consume(parser, TOKEN_IDENTIFIER, error);
 
-  declaration(parser);
+  declaration(parser, force);
 
-  if (parser->compiler->scope > 0) return 0;
-
-  return identifier(parser, &parser->previous);
+  if (parser->compiler->scope == 0 || force == true) 
+    return identifier(parser, &parser->previous);
+  else return 0;
 }
 
 static void begin(Parser* parser) {
@@ -532,22 +534,22 @@ static void function(Parser* parser, Positions position) {
   begin(parser);
 
   if (match(parser, TOKEN_COLON) == false) {
-    consume(parser, TOKEN_OPEN_PARENTHESES, compile_time[EXPECT_OPEN_FUNCTION]);
+    consume(parser, TOKEN_OPEN_PARENTHESES, compile_time_errors[EXPECT_OPEN_FUNCTION]);
 
     if (check(parser, TOKEN_CLOSE_PARENTHESES) == false) {
       do {
         parser->compiler->function->arity++;
 
         if (parser->compiler->function->arity > 255)
-          error(parser, parser->current, compile_time[MAXIMUM_PARAMETERS]);
+          error(parser, parser->current, compile_time_errors[MAXIMUM_PARAMETERS]);
 
-        uint8_t parameter = definition(parser, compile_time[EXPECT_PARAMETER_IDENTIFIER]);
+        uint8_t parameter = definition(parser, compile_time_errors[EXPECT_PARAMETER_IDENTIFIER], false);
         
-        initialize(parser, parameter);
+        initialize(parser, parameter, false);
       } while (match(parser, TOKEN_COMMA) == true);
     }
 
-    consume(parser, TOKEN_CLOSE_PARENTHESES, compile_time[EXPECT_CLOSE_FUNCTION]);
+    consume(parser, TOKEN_CLOSE_PARENTHESES, compile_time_errors[EXPECT_CLOSE_FUNCTION]);
   }
 
   statement(parser);
@@ -575,7 +577,7 @@ static void patch(Parser* parser, int offset) {
   int jump = get_current_chunk(parser->compiler)->count - offset - 2;
 
   if (jump > UINT16_MAX)
-    error(parser, parser->previous, compile_time[MAXIMUM_JUMP_BODY]);
+    error(parser, parser->previous, compile_time_errors[MAXIMUM_JUMP_BODY]);
 
   get_current_chunk(parser->compiler)->code[offset] = (jump >> 8) & 0xff;
   get_current_chunk(parser->compiler)->code[offset + 1] = jump & 0xff;
@@ -587,7 +589,7 @@ static void loop(Parser* parser, int start) {
   int offset = get_current_chunk(parser->compiler)->count - start + 2;
 
   if (offset > UINT16_MAX) 
-    error(parser, parser->previous, compile_time[MINIMUM_LOOP_BODY]);
+    error(parser, parser->previous, compile_time_errors[MINIMUM_LOOP_BODY]);
 
   emit(parser, (offset >> 8) & 0xff);
   emit(parser, offset & 0xff);
@@ -617,32 +619,32 @@ static void or(Parser* parser, bool assign) {
   patch(parser, end);
 }
 
-static void set(Parser* parser) {
+static void set(Parser* parser, bool force) {
   do {
-    uint8_t global = definition(parser, compile_time[EXPECT_VARIABLE_IDENTIFIER]);
+    uint8_t global = definition(parser, compile_time_errors[EXPECT_VARIABLE_IDENTIFIER], force);
 
     if (match(parser, TOKEN_COLON))
       expression(parser);
     else emit(parser, OP_UNDEFINED);
 
-    initialize(parser, global);
+    initialize(parser, global, force);
   } while(match(parser, TOKEN_COMMA));
 
-  consume(parser, TOKEN_SEMICOLON, compile_time[EXPECT_SEMICOLON]);
+  consume(parser, TOKEN_SEMICOLON, compile_time_errors[EXPECT_SEMICOLON]);
 }
 
-static void define(Parser* parser) {
-  uint8_t global = definition(parser, compile_time[EXPECT_FUNCTION_IDENTIFIER]);
-  mark(parser);
+static void define(Parser* parser, bool force) {
+  uint8_t global = definition(parser, compile_time_errors[EXPECT_FUNCTION_IDENTIFIER], force);
+  mark(parser, force);
   function(parser, POSITION_FUNCTION);
-  initialize(parser, global);
+  initialize(parser, global, force);
 }
 
 static void block(Parser* parser) {
   while (check(parser, TOKEN_CLOSE_BRACES) == false && check(parser, TOKEN_EOF) == false) 
     instruction(parser);
 
-  consume(parser, TOKEN_CLOSE_BRACES, compile_time[EXPECT_BLOCK]);
+  consume(parser, TOKEN_CLOSE_BRACES, compile_time_errors[EXPECT_BLOCK]);
 }
 
 static uint8_t arguments(Parser* parser) {
@@ -653,13 +655,13 @@ static uint8_t arguments(Parser* parser) {
       expression(parser);
 
       if (count == 255)
-        error(parser, parser->previous, compile_time[MAXIMUM_ARGUMENTS]);
+        error(parser, parser->previous, compile_time_errors[MAXIMUM_ARGUMENTS]);
 
       count++;
     } while (match(parser, TOKEN_COMMA) == true);
   }
 
-  consume(parser, TOKEN_CLOSE_PARENTHESES, compile_time[EXPECT_ARGUMENTS]);
+  consume(parser, TOKEN_CLOSE_PARENTHESES, compile_time_errors[EXPECT_ARGUMENTS]);
 
   return count;
 }
@@ -674,7 +676,7 @@ static void call(Parser* parser, bool assign) {
 static void conditional(Parser* parser) {
   expression(parser);
 
-  consume(parser, TOKEN_COLON, compile_time[EXPECT_COLON_CONDITION]);
+  consume(parser, TOKEN_COLON, compile_time_errors[EXPECT_COLON_CONDITION]);
 
   int then = jump(parser, OP_JUMP_CONDITIONAL);
 
@@ -689,7 +691,7 @@ static void conditional(Parser* parser) {
   emit(parser, OP_POP);
 
   if (match(parser, TOKEN_ELSE)) {
-    consume(parser, TOKEN_COLON, compile_time[EXPECT_COLON_STATEMENT]);
+    consume(parser, TOKEN_COLON, compile_time_errors[EXPECT_COLON_STATEMENT]);
     
     statement(parser);
   }
@@ -702,7 +704,7 @@ static void iterative(Parser* parser) {
 
   expression(parser);
 
-  consume(parser, TOKEN_COLON, compile_time[EXPECT_COLON_CONDITION]);
+  consume(parser, TOKEN_COLON, compile_time_errors[EXPECT_COLON_CONDITION]);
 
   int exit = jump(parser, OP_JUMP_CONDITIONAL);
 
@@ -722,7 +724,7 @@ static void repeat(Parser* parser) {
 
   statement(parser);
 
-  consume(parser, TOKEN_WHILE, compile_time[EXPECT_WHILE_STATEMENT]);
+  consume(parser, TOKEN_WHILE, compile_time_errors[EXPECT_WHILE_STATEMENT]);
 
   expression(parser);
 
@@ -740,13 +742,19 @@ static void repeat(Parser* parser) {
 static void looping(Parser* parser) {
   begin(parser);
 
-  consume(parser, TOKEN_OPEN_PARENTHESES, compile_time[EXPECT_OPEN_FOR]);
+  consume(parser, TOKEN_OPEN_PARENTHESES, compile_time_errors[EXPECT_OPEN_FOR]);
 
   if (match(parser, TOKEN_SEMICOLON) == false) {
-    if (match(parser, TOKEN_SET) == true) set(parser);
+    if (check(parser, TOKEN_GLOBAL) || check(parser, TOKEN_SET)) {
+      bool force = match(parser, TOKEN_GLOBAL);
+
+      consume(parser, TOKEN_SET, compile_time_errors[EXPECT_SET_OR_DEFINE]);
+
+      set(parser, force);
+    }
     else {
       expression(parser);
-      consume(parser, TOKEN_SEMICOLON, compile_time[EXPECT_SEMICOLON]);
+      consume(parser, TOKEN_SEMICOLON, compile_time_errors[EXPECT_SEMICOLON]);
     }
   }
 
@@ -757,7 +765,7 @@ static void looping(Parser* parser) {
   if (match(parser, TOKEN_SEMICOLON) == false) {
     expression(parser);
 
-    consume(parser, TOKEN_SEMICOLON, compile_time[EXPECT_SEMICOLON]);
+    consume(parser, TOKEN_SEMICOLON, compile_time_errors[EXPECT_SEMICOLON]);
 
     exit = jump(parser, OP_JUMP_CONDITIONAL);
 
@@ -773,7 +781,7 @@ static void looping(Parser* parser) {
 
     emit(parser, OP_POP);
 
-    consume(parser, TOKEN_CLOSE_PARENTHESES, compile_time[EXPECT_CLOSE_FOR]);
+    consume(parser, TOKEN_CLOSE_PARENTHESES, compile_time_errors[EXPECT_CLOSE_FOR]);
 
     loop(parser, start);
 
@@ -812,34 +820,36 @@ static void statement(Parser* parser) {
     looping(parser);
   else if (match(parser, TOKEN_RETURN)) {
     if (parser->compiler->position == POSITION_SCRIPT)
-      error(parser, parser->previous, compile_time[CANNOT_RETURN_SCRIPT]);
+      error(parser, parser->previous, compile_time_errors[CANNOT_RETURN_SCRIPT]);
 
     if (match(parser, TOKEN_SEMICOLON) == false) {
       expression(parser);
-      consume(parser, TOKEN_SEMICOLON, compile_time[EXPECT_SEMICOLON]);
+      consume(parser, TOKEN_SEMICOLON, compile_time_errors[EXPECT_SEMICOLON]);
       emit(parser, OP_RETURN);
     } else close(parser);
   }
   else if (match(parser, TOKEN_EMPTY)) {
     emit(parser, OP_EMPTY);
-    consume(parser, TOKEN_SEMICOLON, compile_time[EXPECT_SEMICOLON]);
+    consume(parser, TOKEN_SEMICOLON, compile_time_errors[EXPECT_SEMICOLON]);
   }
   else if (match(parser, TOKEN_EXIT)) {
     emit(parser, OP_EXIT);
-    consume(parser, TOKEN_SEMICOLON, compile_time[EXPECT_SEMICOLON]);
+    consume(parser, TOKEN_SEMICOLON, compile_time_errors[EXPECT_SEMICOLON]);
   }
   else {
     expression(parser);
     emit(parser, OP_POP);
-    consume(parser, TOKEN_SEMICOLON, compile_time[EXPECT_SEMICOLON]);
+    consume(parser, TOKEN_SEMICOLON, compile_time_errors[EXPECT_SEMICOLON]);
   }
 }
 
 static void instruction(Parser* parser) {
-  if (match(parser, TOKEN_SET))
-    set(parser);
-  else if (match(parser, TOKEN_DEFINE))
-    define(parser);
+  bool force = match(parser, TOKEN_GLOBAL);
+
+  if (match(parser, TOKEN_SET) == true)
+    set(parser, force);
+  else if (match(parser, TOKEN_DEFINE) == true)
+    define(parser, force);
   else statement(parser);
 
   if (parser->panic) 
@@ -852,7 +862,7 @@ static void parse(Parser* parser, Precedences precedence) {
   Execute prefix = rules[parser->previous.type].prefix;
 
   if (prefix == NULL) {
-    error(parser, parser->previous, compile_time[EXPECT_EXPRESSION]);
+    error(parser, parser->previous, compile_time_errors[EXPECT_EXPRESSION]);
     return;
   }
 
@@ -867,7 +877,7 @@ static void parse(Parser* parser, Precedences precedence) {
   }
 
   if (assign && match(parser, TOKEN_EQUAL))
-    error(parser, parser->previous, compile_time[INVALID_ASSIGNMENT_TARGET]);
+    error(parser, parser->previous, compile_time_errors[INVALID_ASSIGNMENT_TARGET]);
 }
 
 Function* compile(VM* vm, const char* source) {

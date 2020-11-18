@@ -38,7 +38,7 @@ bool equal(Value left, Value right) {
     
     case VALUE_OBJECT: {
       if (OBJECT_TYPE(left) == OBJECT_NUMBER)
-        return mpf_cmp(AS_NUMBER(left), AS_NUMBER(right)) == 0; 
+        return mpf_cmp(AS_NUMBER(left)->content, AS_NUMBER(right)->content) == 0; 
       else return AS_OBJECT(left) == AS_OBJECT(right);
     }
 

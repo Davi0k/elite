@@ -29,19 +29,19 @@ Upvalue* new_upvalue(VM* vm, Value* location) {
   return upvalue;
 }
 
-Number* new_number(VM* vm, mpf_t value) {
+Number* allocate_number(VM* vm, mpf_t value) {
   Number* number = ALLOCATE_OBJECT(vm, Number, OBJECT_NUMBER);
   mpf_init_set(number->content, value);
   return number;
 }
 
-Number* number_from_double(VM* vm, double value) {
+Number* allocate_number_from_double(VM* vm, double value) {
   Number* number = ALLOCATE_OBJECT(vm, Number, OBJECT_NUMBER);
   mpf_init_set_d(number->content, value);
   return number;
 }
 
-Number* number_from_string(VM* vm, const char* value) {
+Number* allocate_number_from_string(VM* vm, const char* value) {
   Number* number = ALLOCATE_OBJECT(vm, Number, OBJECT_NUMBER);
   mpf_init_set_str(number->content, value, 10);
   return number;
@@ -124,7 +124,7 @@ void print_object(Value value) {
   switch (OBJECT_TYPE(value)) {
     case OBJECT_UPVALUE: printf("upvalue"); break;
 
-    case OBJECT_NUMBER: gmp_printf("%.Ff", AS_NUMBER(value)); break;
+    case OBJECT_NUMBER: gmp_printf("%.Ff", AS_NUMBER(value)->content); break;
 
     case OBJECT_STRING: printf("%s", AS_STRING(value)->content); break;
 

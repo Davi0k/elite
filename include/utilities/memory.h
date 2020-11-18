@@ -6,6 +6,7 @@
 #include "types/object.h"
 
 #define MINIMUM 8
+
 #define MULTIPLICATOR 2
 
 #define ALLOCATE(type, count) \

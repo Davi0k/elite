@@ -4,8 +4,10 @@
 #include "common.h"
 #include "types/value.h"
 
+#define STACK_DEFAULT_SIZE ( 1024 * 64 )
+
 typedef struct {
-  Value content[STACK_MAX];
+  Value content[STACK_DEFAULT_SIZE];
   Value* top;
 } Stack;
 

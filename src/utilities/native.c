@@ -26,22 +26,22 @@ void set_handler(Handler* handler, VM* vm) {
 
   handler->error = false;
 
-  strncpy(handler->message, run_time[UNDEFINED_ERROR], LINE_LENGTH_MAX);
+  strncpy(handler->message, run_time_errors[UNDEFINED_ERROR], LINE_LENGTH_MAX);
 }
 
 Value stopwatch_native(int count, Value* arguments, Handler* handler) {
   if (count == 0) {
     double seconds = (double)clock() / CLOCKS_PER_SEC;
 
-    return NUMBER_FROM_DOUBLE(handler->vm, seconds);
+    return OBJECT(allocate_number_from_double(handler->vm, seconds));
   } 
 
-  return error(handler, run_time[EXPECT_ARGUMENTS_NUMBER], 2, 0, count);
+  return error(handler, run_time_errors[EXPECT_ARGUMENTS_NUMBER], 2, 0, count);
 }
 
 Value number_native(int count, Value* arguments, Handler* handler) {
   if (count == 0) 
-    return NUMBER_FROM_DOUBLE(handler->vm, 0.0);
+    return OBJECT(allocate_number_from_double(handler->vm, 0.0));
 
   if (count == 1) {
     Value argument = arguments[0];
@@ -50,19 +50,39 @@ Value number_native(int count, Value* arguments, Handler* handler) {
       return argument;
 
     if (IS_STRING(argument))
-      return NUMBER_FROM_STRING(handler->vm, AS_STRING(argument)->content);
+      return OBJECT(allocate_number_from_string(handler->vm, AS_STRING(argument)->content));
 
-    return error(handler, run_time[MUST_BE_NUMBER_OR_STRING], 0);
+    return error(handler, run_time_errors[MUST_BE_NUMBER_OR_STRING], 0);
   }
 
-  return error(handler, run_time[EXPECT_ARGUMENTS_NUMBER], 2, 1, count);
+  return error(handler, run_time_errors[EXPECT_ARGUMENTS_NUMBER], 2, 1, count);
 }
 
 Value print_native(int count, Value* arguments, Handler* handler) {
   for (int i = 0; i < count; i++)
     print_value(arguments[i]);
-
-  printf("\n");
   
+  printf("\n");
+
   return UNDEFINED;
+}
+
+Value input_native(int count, Value* arguments, Handler* handler) {
+  if (count == 0 || count == 1) {
+    if (count == 1) {
+      if (IS_STRING(arguments[0]) == true) 
+        print_value(arguments[0]);
+      else return error(handler, run_time_errors[MUST_BE_STRING], 0);
+    }
+
+    char* content = NULL;
+
+    size_t size = 0;
+
+    ssize_t length = getline(&content, &size, stdin);
+
+    return STRING(handler->vm, content, length - 1);
+  } 
+  
+  return error(handler, run_time_errors[EXPECT_ARGUMENTS_NUMBER], 2, 1, count);
 }
