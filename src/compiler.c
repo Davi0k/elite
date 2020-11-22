@@ -70,11 +70,13 @@ static void and(Parser* parser, bool assign);
 static void or(Parser* parser, bool assign);
 
 static void variable(Parser* parser, bool assign);
+static void function(Parser* parser, bool assign);
 
 static void call(Parser* parser, bool assign);
 
-static void instruction(Parser* parser);
+static void block(Parser* parser);
 static void statement(Parser* parser);
+static void instruction(Parser* parser);
 
 Rule rules[] = { 
   [ TOKEN_EOF ] = { NULL, NULL, PRECEDENCE_NONE },
@@ -138,7 +140,7 @@ Rule rules[] = {
   [ TOKEN_DO ] = { NULL, NULL, PRECEDENCE_NONE },
   [ TOKEN_FOR ] = { NULL, NULL, PRECEDENCE_NONE },
 
-  [ TOKEN_DEFINE ] = { NULL, NULL, PRECEDENCE_NONE },
+  [ TOKEN_DEFINE ] = { function, NULL, PRECEDENCE_NONE },
   [ TOKEN_RETURN ] = { NULL, NULL, PRECEDENCE_NONE },
 
   [ TOKEN_SEMICOLON ] = { NULL, NULL, PRECEDENCE_NONE}
@@ -526,10 +528,10 @@ static void variable(Parser* parser, bool assign) {
   emit(parser, argument);
 }
 
-static void function(Parser* parser, Positions position) {
+static void function(Parser* parser, bool assign) {
   Compiler compiler;
 
-  set_compiler(parser, &compiler, position);
+  set_compiler(parser, &compiler, POSITION_FUNCTION);
 
   begin(parser);
 
@@ -552,9 +554,17 @@ static void function(Parser* parser, Positions position) {
     consume(parser, TOKEN_CLOSE_PARENTHESES, compile_time_errors[EXPECT_CLOSE_FUNCTION]);
   }
 
-  statement(parser);
+  if (match(parser, TOKEN_OPEN_BRACES) == true)
+    block(parser);
+  else {
+    expression(parser);
+    emit(parser, OP_RETURN);
+  }
 
   Function* function = terminate_compiler(parser);
+
+  if (assign == true)
+    function->identifier = NULL;
 
   stream(parser, 2, OP_CLOSURE, make(parser, OBJECT(function)));
 
@@ -636,7 +646,7 @@ static void set(Parser* parser, bool force) {
 static void define(Parser* parser, bool force) {
   uint8_t global = definition(parser, compile_time_errors[EXPECT_FUNCTION_IDENTIFIER], force);
   mark(parser, force);
-  function(parser, POSITION_FUNCTION);
+  function(parser, false);
   initialize(parser, global, force);
 }
 
@@ -840,6 +850,12 @@ static void statement(Parser* parser) {
 
 static void instruction(Parser* parser) {
   bool force = match(parser, TOKEN_GLOBAL);
+
+  if (force == true) 
+    if (check(parser, TOKEN_SET) == false && check(parser, TOKEN_DEFINE) == false) {
+      error(parser, parser->previous, compile_time_errors[EXPECT_SET_OR_DEFINE]);
+      return;
+    }
 
   if (match(parser, TOKEN_SET) == true)
     set(parser, force);

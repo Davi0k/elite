@@ -76,6 +76,8 @@ static void error(VM* vm, const char* message, ...) {
 
   fputs("\n", stderr);
 
+  int previous = 0, counter = 0;
+
   for (int i = vm->count - 1; i >= 0; i--) {
     Frame* frame = &vm->frames[i];
 
@@ -83,16 +85,31 @@ static void error(VM* vm, const char* message, ...) {
 
     size_t instruction = frame->ip - function->chunk.code - 1;
 
-    fprintf(stderr, "[Line N°%d] in ", function->chunk.lines[instruction]);
+    if (previous == function->chunk.lines[instruction]) {
+      counter = counter + 1;
 
-    if (function->identifier == NULL)
+      continue;
+    }
+
+    if (counter != 0) {
+      fprintf(stderr, "- The above line repeats %d times. -\n", counter);
+      counter = 0;
+    }
+
+    previous = function->chunk.lines[instruction];
+
+    fprintf(stderr, "[Line N°%d] in ", previous);
+
+    if (i == 0)
       fprintf(stderr, "Script.\n");
-    else fprintf(stderr, "'%s' Function\n", function->identifier->content);
+    else if (function->identifier == NULL) 
+      fprintf(stderr, "an immediately declared Function\n");
+    else 
+      fprintf(stderr, "'%s' Function\n", function->identifier->content);
   }
 
   reset(vm);
 }
-#include "helpers/debug.h"
 
 static bool invoke(VM* vm, Closure* closure, int count) {
   if (count != closure->function->arity) {

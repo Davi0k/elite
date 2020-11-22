@@ -3,12 +3,13 @@
 Elite is a Multi-Paradigm and Stack-Based interpreter written in C. It has a simple and easy grammar and works with a Compiler written following the `Pratt's Parser` technique and a Virtual Machine built using  `Direct Threading` dispatching. 
 
 ### Language Keywords
-The interpreter currently supports a total of **17** keywords. Those are:
+The interpreter currently supports a total of **18** keywords. Those are:
 ```
 and | define | do | else | 
-empty | exit | false | for |
-if | not | or | return |
-set | true | undefined | void | while
+empty | exit | false | for | 
+global | if | not | or | 
+return | set | true | undefined | 
+void | while
 ```
 
 ## Building the interpreter
