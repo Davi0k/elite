@@ -53,5 +53,4 @@ void native(VM* vm, const char* identifier, Internal internal);
 
 Results interpret(VM* vm, const char* source);
 
-
 #endif

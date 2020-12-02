@@ -1,8 +1,8 @@
 
-#ifndef ERROR_H
-#define ERROR_H
+#ifndef GENERIC_H
+#define GENERIC_H
 
-typedef enum {
+enum {
   TOO_MANY_CONSTANTS,
   TOO_MANY_LOCALS,
   CANNOT_READ_INITIALIZER,
@@ -32,9 +32,9 @@ typedef enum {
   EXPECT_CLASS_IDENTIFIER,
   EXPECT_OPEN_CLASS,
   EXPECT_CLOSE_CLASS
-} COMPILE_TIME_ERRORS;
+};
 
-typedef enum {
+enum {
   EXPECT_ARGUMENTS_NUMBER,
   STACK_OVERFLOW,
   CANNOT_CALL,
@@ -45,7 +45,16 @@ typedef enum {
   MUST_BE_NUMBER_OR_STRING,
   MUST_BE_NUMBERS_OR_STRINGS,
   UNDEFINED_VARIABLE,
-  UNDEFINED_ERROR
-} RUN_TIME_ERRORS;
+  UNDEFINED_ERROR,
+  MUST_INCLUDE_STRING
+};
+
+enum {
+  CANNOT_OPEN_FILE,
+  CANNOT_READ_FILE,
+  NOT_ENOUGH_MEMORY
+};
+
+char* read(const char* path, int* error);
 
 #endif

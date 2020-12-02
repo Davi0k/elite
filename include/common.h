@@ -7,7 +7,7 @@
 
 #include "gmp.h"
 
-#include "helpers/error.h"
+#include "utilities/generic.h"
 
 #define NULL_TERMINATOR '\0'
 
@@ -21,6 +21,7 @@
 
 extern const char* compile_time_errors[];
 extern const char* run_time_errors[];
+extern const char* read_file_errors[];
 
 typedef struct VM VM;
 

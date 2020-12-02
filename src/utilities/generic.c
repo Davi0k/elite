@@ -1,4 +1,8 @@
-#include "helpers/error.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "utilities/generic.h"
 
 const char* compile_time_errors[] = {
   [TOO_MANY_CONSTANTS] = "Too many Constants in one single Chunk.",
@@ -43,5 +47,45 @@ const char* run_time_errors[] = {
   [MUST_BE_NUMBER_OR_STRING] = "Operand must be a Number or a String.",
   [MUST_BE_NUMBERS_OR_STRINGS] = "Operands must be two Numbers or two Strings.",
   [UNDEFINED_VARIABLE] = "Undefined variable '%s'.",
-  [UNDEFINED_ERROR] = "Undefined Error Message."
+  [UNDEFINED_ERROR] = "Undefined Error Message.",
+  [MUST_INCLUDE_STRING] = "Expect String after 'include' statement."
 };
+
+const char* read_file_errors[] = {
+  [CANNOT_OPEN_FILE] = "Could not open file <%s>.",
+  [CANNOT_READ_FILE] = "Could not read file <%s>.",
+  [NOT_ENOUGH_MEMORY] = "Not enough memory to read file."
+};
+
+char* read(const char* path, int* error) {
+  FILE* file = fopen(path, "rb");
+
+  if (file == NULL) {
+    error = (int*)CANNOT_OPEN_FILE;
+    return NULL;
+  }
+
+  fseek(file, 0L, SEEK_END);
+  size_t size = ftell(file);
+  rewind(file);
+
+  char* buffer = (char*)malloc(size + 1);
+
+  if (buffer == NULL) {
+    error = (int*)CANNOT_READ_FILE;
+    return NULL;
+  }
+
+  size_t bytes = fread(buffer, sizeof(char), size, file);
+
+  if (bytes < size) {
+    error = (int*)NOT_ENOUGH_MEMORY;
+    return NULL;
+  }
+
+  buffer[bytes] = '\0';
+
+  fclose(file);
+  
+  return buffer;
+}
