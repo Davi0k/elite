@@ -121,6 +121,7 @@ static Types keyword(Tokenizer* tokenizer, int start, int length, const char* re
 static Types trie(Tokenizer* tokenizer) {
   switch (tokenizer->start[0]) {
     case 'a': return keyword(tokenizer, 1, 2, "nd", TOKEN_AND);
+    case 'c': return keyword(tokenizer, 1, 4, "lass", TOKEN_CLASS);
 
     case 'd': 
       if (tokenizer->current - tokenizer->start > 1) {
@@ -157,9 +158,20 @@ static Types trie(Tokenizer* tokenizer) {
     case 'i': return keyword(tokenizer, 1, 1, "f", TOKEN_IF);
     case 'n': return keyword(tokenizer, 1, 2, "ot", TOKEN_NOT);
     case 'o': return keyword(tokenizer, 1, 1, "r", TOKEN_OR);
+    case 'p': return keyword(tokenizer, 1, 5, "arent", TOKEN_PARENT);
     case 'r': return keyword(tokenizer, 1, 5, "eturn", TOKEN_RETURN);
     case 's': return keyword(tokenizer, 1, 2, "et", TOKEN_SET);
-    case 't': return keyword(tokenizer, 1, 3, "rue", TOKEN_TRUE);
+
+    case 't':
+      if (tokenizer->current - tokenizer->start > 1) {
+        switch (tokenizer->start[1]) {
+          case 'h': return keyword(tokenizer, 2, 2, "is", TOKEN_THIS);
+          case 'r': return keyword(tokenizer, 2, 2, "ue", TOKEN_TRUE);
+        }
+      }
+
+      break;
+
     case 'u': return keyword(tokenizer, 1, 8, "ndefined", TOKEN_UNDEFINED);
     case 'v': return keyword(tokenizer, 1, 3, "oid", TOKEN_VOID);
     case 'w': return keyword(tokenizer, 1, 4, "hile", TOKEN_WHILE);

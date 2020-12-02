@@ -26,7 +26,10 @@ const char* compile_time_errors[] = {
   [EXPECT_OPEN_FOR] = "Expect '(' before 'for' branch.",
   [EXPECT_CLOSE_FOR] = "Expect '(' after 'for' branch.",
   [TOO_MANY_CLOSURE_VARIABLES] = "Too many closure variables in Function.",
-  [EXPECT_SET_OR_DEFINE] = "Expect 'set' or 'define' statement after 'global' modifier."
+  [EXPECT_SET_DEFINE_CLASS] = "Expect 'set', 'define' or 'class' statement after 'global' modifier.",
+  [EXPECT_CLASS_IDENTIFIER] = "Expect Class identifier.",
+  [EXPECT_OPEN_CLASS] = "Expect '{' before Class body.",
+  [EXPECT_CLOSE_CLASS] = "Expect '}' after Class body."
 };
 
 const char* run_time_errors[] = {

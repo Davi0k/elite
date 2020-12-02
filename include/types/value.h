@@ -9,6 +9,7 @@ typedef struct Number Number;
 typedef struct String String;
 typedef struct Function Function;
 typedef struct Closure Closure;
+typedef struct Class Class;
 typedef struct Native Native;
 
 #define BOOLEAN(value) ( (Value){ VALUE_BOOLEAN, { .boolean = value } } )

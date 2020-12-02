@@ -114,6 +114,12 @@ Closure* new_closure(VM* vm, Function* function) {
   return closure;
 }
 
+Class* new_class(VM* vm, String* identifier) {
+  Class* class = ALLOCATE_OBJECT(vm, Class, OBJECT_CLASS);
+  class->identifier = identifier;
+  return class;
+}
+
 Native* new_native(VM* vm, Internal internal) {
   Native* native = ALLOCATE_OBJECT(vm, Native, OBJECT_NATIVE);
   native->internal = internal;
@@ -140,6 +146,8 @@ void print_object(Value value) {
 
     case OBJECT_CLOSURE: printf("<Closure Function %s>", AS_CLOSURE(value)->function->identifier->content); break;
 
-    case OBJECT_NATIVE: printf("<Native Function>"); break;
+    case OBJECT_CLASS: printf("<Class %s>", AS_CLASS(value)->identifier->content); break;
+
+    case OBJECT_NATIVE: printf("<Native>"); break;
   }
 }

@@ -141,6 +141,10 @@ Rule rules[] = {
   [ TOKEN_DEFINE ] = { function, NULL, PRECEDENCE_NONE },
   [ TOKEN_RETURN ] = { NULL, NULL, PRECEDENCE_NONE },
 
+  [ TOKEN_CLASS ] = { NULL, NULL, PRECEDENCE_NONE },
+  [ TOKEN_THIS ] = { NULL, NULL, PRECEDENCE_NONE },
+  [ TOKEN_PARENT ] = { NULL, NULL, PRECEDENCE_NONE },
+
   [ TOKEN_SEMICOLON ] = { NULL, NULL, PRECEDENCE_NONE}
 };
 
@@ -648,6 +652,20 @@ static void define(Parser* parser, bool force) {
   initialize(parser, global, force);
 }
 
+static void declare(Parser* parser, bool force) {
+  consume(parser, TOKEN_IDENTIFIER, compile_time_errors[EXPECT_CLASS_IDENTIFIER]);
+  uint8_t global = identifier(parser, &parser->previous);
+  declaration(parser, force);
+
+  emit(parser, OP_CLASS);
+  emit(parser, global);
+  
+  initialize(parser, global, force);
+
+  consume(parser, TOKEN_OPEN_BRACES, compile_time_errors[EXPECT_OPEN_CLASS]);
+  consume(parser, TOKEN_CLOSE_BRACES, compile_time_errors[EXPECT_CLOSE_CLASS]);
+}
+
 static void block(Parser* parser) {
   while (check(parser, TOKEN_CLOSE_BRACES) == false && check(parser, TOKEN_EOF) == false) 
     instruction(parser);
@@ -850,8 +868,12 @@ static void instruction(Parser* parser) {
   bool force = match(parser, TOKEN_GLOBAL);
 
   if (force == true) 
-    if (check(parser, TOKEN_SET) == false && check(parser, TOKEN_DEFINE) == false) {
-      error(parser, parser->previous, compile_time_errors[EXPECT_SET_OR_DEFINE]);
+    if (
+      check(parser, TOKEN_SET) == false && 
+      check(parser, TOKEN_DEFINE) == false && 
+      check(parser, TOKEN_CLASS) == false
+    ) {
+      error(parser, parser->previous, compile_time_errors[EXPECT_SET_DEFINE_CLASS]);
       return;
     }
 
@@ -859,6 +881,8 @@ static void instruction(Parser* parser) {
     set(parser, force);
   else if (match(parser, TOKEN_DEFINE) == true)
     define(parser, force);
+  else if (match(parser, TOKEN_CLASS) == true)
+    declare(parser, force);
   else statement(parser);
 
   if (parser->panic) 

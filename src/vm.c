@@ -24,7 +24,7 @@ void initialize_VM(VM* vm) {
 
   vm->allocate = 0;
 
-  vm->garbage = DEFAULT_THRESHOLD;
+  vm->threshold = DEFAULT_THRESHOLD;
 
   reset(vm);
 
@@ -543,6 +543,14 @@ static Results run(VM* vm) {
   OP_CLOSE: {
     close(vm, vm->stack.top - 1);
     pop(&vm->stack, 1);
+    COMPUTE_NEXT();
+  }
+
+  OP_CLASS: {
+    Class* class = new_class(vm, AS_STRING(READ_CONSTANT()));
+
+    push(&vm->stack, OBJECT(class));
+
     COMPUTE_NEXT();
   }
 

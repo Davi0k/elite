@@ -5,7 +5,7 @@ void* reallocate(VM* vm, void* pointer, size_t oldest, size_t newest) {
   vm->allocate += newest - oldest;
 
   if (newest > oldest)
-    if (vm->allocate > vm->garbage)
+    if (vm->allocate > vm->threshold)
       recycle(vm);
 
   if (newest == 0) {
@@ -33,7 +33,7 @@ void recycle(VM* vm) {
 
   sweep(vm);
 
-  vm->garbage = vm->allocate * GARBAGE_COLLECTOR_GROW_FACTOR;
+  vm->threshold = vm->allocate * GARBAGE_COLLECTOR_GROW_FACTOR;
 
   free(parents.content);
 }
@@ -72,7 +72,12 @@ void traverse(VM* vm, Parents* parents) {
     switch (object->type) {
       case OBJECT_UPVALUE: {
         mark(parents, ((Upvalue*)object)->closed);
+        break;
+      }
 
+      case OBJECT_CLASS: {
+        Class* class = (Class*)object;
+        mark(parents, OBJECT(class->identifier));
         break;
       }
 
@@ -101,8 +106,6 @@ void traverse(VM* vm, Parents* parents) {
       }
     }
   }
-
-  table_clear(&vm->strings);
 }
 
 void mark(Parents* parents, Value value) {
@@ -127,6 +130,8 @@ void mark(Parents* parents, Value value) {
 }
 
 void sweep(VM* vm) {
+  table_clear(&vm->strings);
+
   Object* previous = NULL;
 
   Object* object = vm->objects;
@@ -184,6 +189,11 @@ void free_object(VM* vm, Object* object) {
       Closure* closure = (Closure*)object;
       FREE_ARRAY(vm, Upvalue*, closure->upvalues, closure->count);
       FREE(vm, Closure, object);
+      break;
+    }
+
+    case OBJECT_CLASS: {
+      FREE(vm, Class, object);
       break;
     }
 

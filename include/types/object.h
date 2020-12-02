@@ -18,12 +18,14 @@
 #define IS_STRING(value) validate(value, OBJECT_STRING)
 #define IS_FUNCTION(value) validate(value, OBJECT_FUNCTION)
 #define IS_CLOSURE(value) validate(value, OBJECT_CLOSURE)
+#define IS_CLASS(value) validate(value, OBJECT_CLASS)
 #define IS_NATIVE(value) validate(value, OBJECT_NATIVE)
 
 #define AS_NUMBER(value) ( ( (Number*)AS_OBJECT(value) ) )
 #define AS_STRING(value) ( (String*)AS_OBJECT(value) )
 #define AS_FUNCTION(value) ( (Function*)AS_OBJECT(value) )
 #define AS_CLOSURE(value) ( (Closure*)AS_OBJECT(value) )
+#define AS_CLASS(value) ( (Class*)AS_OBJECT(value) )
 #define AS_NATIVE(value) ( ( (Native*)AS_OBJECT(value) )->internal )
 
 typedef enum {
@@ -32,6 +34,7 @@ typedef enum {
   OBJECT_STRING,
   OBJECT_FUNCTION,
   OBJECT_CLOSURE,
+  OBJECT_CLASS,
   OBJECT_NATIVE
 } Objects;
 
@@ -75,6 +78,11 @@ typedef struct Closure {
   int count;
 } Closure;
 
+typedef struct Class {
+  Object object;
+  String* identifier;
+} Class;
+
 typedef struct Native {
   Object object;
   Internal internal;
@@ -95,6 +103,8 @@ String* take_string(VM* vm, const char* content, int length);
 Function* new_function(VM* vm);
 
 Closure* new_closure(VM* vm, Function* function);
+
+Class* new_class(VM* vm, String* identifier);
 
 Native* new_native(VM* vm, Internal internal);
 

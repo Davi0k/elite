@@ -31,7 +31,7 @@ typedef struct VM {
   int capacity;
   int count;
 
-  size_t allocate, garbage;
+  size_t allocate, threshold;
 
   Stack stack;
 
