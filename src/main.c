@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "common.h"
+
 #include "vm.h"
 
 #define VERSION "1.0.0"

@@ -1,6 +1,8 @@
 #ifndef TOKENIZER_H
 #define TOKENIZER_H
 
+#include "common.h"
+
 typedef enum {
   TOKEN_EOF, TOKEN_ERROR, TOKEN_EMPTY, TOKEN_EXIT,
   TOKEN_IDENTIFIER,

@@ -2,9 +2,9 @@
 #define OBJECT_H
 
 #include "common.h"
+
 #include "vm.h"
 #include "utilities/native.h"
-#include "utilities/chunk.h"
 #include "types/value.h"
 
 #define GMP_NEUTRAL(vm) ( OBJECT(allocate_number_from_double(vm, 1.0)) )
@@ -38,6 +38,7 @@ typedef enum {
 typedef struct Object {
   Objects type;
   struct Object* next;
+  bool mark;
 } Object;
 
 typedef struct Upvalue {
@@ -48,19 +49,19 @@ typedef struct Upvalue {
 } Upvalue;
 
 typedef struct Number {
-  Object Object;
+  Object object;
   mpf_t content;
 } Number;
 
 typedef struct String {
-  Object Object;
+  Object object;
   int length;
   char* content;
   uint32_t hash;
 } String;
 
 typedef struct Function {
-  Object Object;
+  Object object;
   String* identifier;
   Chunk chunk;
   int arity;

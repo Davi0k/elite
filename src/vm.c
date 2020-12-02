@@ -3,26 +3,15 @@
 #include <string.h>
 #include <limits.h>
 
-#include "helpers/stack.h"
-#include "helpers/error.h"
-#include "utilities/memory.h"
-#include "types/object.h"
-#include "common.h"
 #include "vm.h"
-
-void native(VM* vm, const char* identifier, Internal internal) {
-  push(&vm->stack, OBJECT(copy_string(vm, identifier, (int)strlen(identifier))));
-  push(&vm->stack, OBJECT(new_native(vm, internal)));
-
-  table_set(&vm->globals, AS_STRING(vm->stack.content[0]), vm->stack.content[1]);
-
-  pop(&vm->stack, 2);
-}
+#include "types/object.h"
+#include "utilities/memory.h"
+#include "helpers/stack.h"
 
 void reset(VM* vm) {
   vm->count = 0;
   vm->capacity = FRAME_DEFAULT_SIZE;
-  vm->frames = GROW_ARRAY(Frame, vm->frames, 0 , vm->capacity);
+  vm->frames = GROW_ARRAY(vm, Frame, vm->frames, 0 , vm->capacity);
   
   vm->upvalues = NULL;
 
@@ -33,10 +22,14 @@ void initialize_VM(VM* vm) {
   vm->frames = NULL;
   vm->objects = NULL;
 
+  vm->allocate = 0;
+
+  vm->garbage = DEFAULT_THRESHOLD;
+
   reset(vm);
 
-  initialize_table(&vm->strings);
-  initialize_table(&vm->globals);
+  initialize_table(&vm->strings, vm);
+  initialize_table(&vm->globals, vm);
 
   native(vm, "stopwatch", stopwatch_native);
   native(vm, "number", number_native);
@@ -49,14 +42,23 @@ void free_VM(VM* vm) {
 
   while (object != NULL) {
     Object* next = object->next;
-    free_object(object);
+    free_object(vm, object);
     object = next;
   }
 
   free_table(&vm->strings); 
   free_table(&vm->globals); 
 
-  FREE_ARRAY(Frame, vm->frames, vm->capacity);
+  FREE_ARRAY(vm, Frame, vm->frames, vm->capacity);
+}
+
+void native(VM* vm, const char* identifier, Internal internal) {
+  push(&vm->stack, OBJECT(copy_string(vm, identifier, (int)strlen(identifier))));
+  push(&vm->stack, OBJECT(new_native(vm, internal)));
+
+  table_set(&vm->globals, AS_STRING(vm->stack.content[0]), vm->stack.content[1]);
+
+  pop(&vm->stack, 2);
 }
 
 static bool falsey(Value value) {
@@ -103,7 +105,7 @@ static void error(VM* vm, const char* message, ...) {
     if (i == 0)
       fprintf(stderr, "Script.\n");
     else if (function->identifier == NULL) 
-      fprintf(stderr, "an immediately declared Function\n");
+      fprintf(stderr, "an anonymous Function\n");
     else 
       fprintf(stderr, "'%s' Function\n", function->identifier->content);
   }
@@ -118,7 +120,7 @@ static bool invoke(VM* vm, Closure* closure, int count) {
   }
 
   if (vm->capacity < vm->count + 1) {
-    if (GROW_CAPACITY(vm->capacity) > INT_MAX / (vm->capacity == 0 ? 1 : vm->capacity)) {
+    if (GROW_CAPACITY(vm->capacity) > INT32_MAX / (vm->capacity == 0 ? 1 : vm->capacity)) {
       error(vm, run_time_errors[STACK_OVERFLOW]);
       return false;
     }
@@ -127,7 +129,7 @@ static bool invoke(VM* vm, Closure* closure, int count) {
 
     vm->capacity = GROW_CAPACITY(capacity);
 
-    vm->frames = GROW_ARRAY(Frame, vm->frames, capacity, vm->capacity);
+    vm->frames = GROW_ARRAY(vm, Frame, vm->frames, capacity, vm->capacity);
   }
 
   Frame* frame = &vm->frames[vm->count++];
@@ -295,12 +297,12 @@ static Results run(VM* vm) {
     }
 
     if (IS_STRING(peek(&vm->stack, 0)) && IS_STRING(peek(&vm->stack, 1))) {
-      String* right = AS_STRING(pop(&vm->stack, 1));
-      String* left = AS_STRING(pop(&vm->stack, 1));
+      String* right = AS_STRING(peek(&vm->stack, 0));
+      String* left = AS_STRING(peek(&vm->stack, 0));
 
       int length = left->length + right->length;
 
-      char* content = ALLOCATE(char, length + 1);
+      char* content = ALLOCATE(vm, char, length + 1);
 
       memcpy(content, left->content, left->length);
       memcpy(content + left->length, right->content, right->length);
@@ -308,6 +310,8 @@ static Results run(VM* vm) {
       content[length] = '\0';
 
       String* result = take_string(vm, content, length);
+
+      pop(&vm->stack, 2);
 
       push(&vm->stack, OBJECT(result));
 
@@ -500,7 +504,7 @@ static Results run(VM* vm) {
 
       vm->capacity = vm->capacity / 2;
 
-      vm->frames = GROW_ARRAY(Frame, vm->frames, capacity, vm->capacity);
+      vm->frames = GROW_ARRAY(vm, Frame, vm->frames, capacity, vm->capacity);
     }
 
     if (vm->count == 0) {

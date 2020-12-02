@@ -2,6 +2,7 @@
 #define NATIVE_H
 
 #include "common.h"
+
 #include "utilities/table.h"
 #include "types/value.h"
 

@@ -1,19 +1,20 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "utilities/memory.h"
 #include "types/value.h"
 #include "types/object.h"
+#include "utilities/memory.h"
 
-void initialize_constants(Constants* constants) {
+void initialize_constants(Constants* constants, VM* vm) {
   constants->values = NULL;
   constants->capacity = 0;
   constants->count = 0;
+
+  constants->vm = vm;
 }
 
 void free_constants(Constants* constants) {
-  FREE_ARRAY(Value, constants->values, constants->capacity);
-  initialize_constants(constants);
+  FREE_ARRAY(constants->vm, Value, constants->values, constants->capacity);
 }
 
 void write_constants(Constants* constants, Value value) {
@@ -22,7 +23,7 @@ void write_constants(Constants* constants, Value value) {
 
     constants->capacity = GROW_CAPACITY(capacity);
 
-    constants->values = GROW_ARRAY(Value, constants->values, capacity, constants->capacity);
+    constants->values = GROW_ARRAY(constants->vm, Value, constants->values, capacity, constants->capacity);
   }
 
   constants->values[constants->count] = value;

@@ -1,7 +1,8 @@
 #ifndef COMPILER_H
 #define COMPILER_H
 
-#include "vm.h"
+#include "common.h"
+
 #include "tokenizer.h"
 #include "utilities/chunk.h"
 

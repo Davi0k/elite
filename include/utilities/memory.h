@@ -2,29 +2,47 @@
 #define MEMORY_H
 
 #include "common.h"
-#include "vm.h"
+
 #include "types/object.h"
 
 #define MINIMUM 8
 
 #define MULTIPLICATOR 2
 
-#define ALLOCATE(type, count) \
-  (type*)reallocate(NULL, 0, sizeof(type) * count)
-
-#define FREE(type, pointer) reallocate(pointer, sizeof(type), 0)
-
-#define FREE_ARRAY(type, pointer, old) \
-    reallocate( pointer, sizeof(type) * (old), 0 )
+#define GARBAGE_COLLECTOR_GROW_FACTOR 2
 
 #define GROW_CAPACITY(capacity) \
   ( (capacity) < MINIMUM ? MINIMUM : (capacity) * MULTIPLICATOR )
 
-#define GROW_ARRAY(type, pointer, oldest, newest) \
-    (type*)reallocate( pointer, sizeof(type) * (oldest), sizeof(type) * (newest) )
+#define ALLOCATE(vm, type, count) \
+  (type*)reallocate(vm, NULL, 0, sizeof(type) * count)
 
-void* reallocate(void* pointer, size_t oldest, size_t newest);
+#define FREE(vm, type, pointer) \
+  reallocate(vm, pointer, sizeof(type), 0)
 
-void free_object(Object* object);
+#define FREE_ARRAY(vm, type, pointer, old) \
+  reallocate( vm, pointer, sizeof(type) * (old), 0 )
+
+#define GROW_ARRAY(vm, type, pointer, oldest, newest) \
+  (type*)reallocate( vm, pointer, sizeof(type) * (oldest), sizeof(type) * (newest) )
+
+typedef struct {
+  int count;
+  int capacity;
+  Object** content;
+} Parents;
+
+void* reallocate(VM* vm, void* pointer, size_t oldest, size_t newest);
+
+void recycle(VM* vm);
+
+void roots(VM* vm, Parents* parents);
+void traverse(VM* vm, Parents* parents);
+
+void mark(Parents* parents, Value value);
+
+void sweep(VM* vm);
+
+void free_object(VM* vm, Object* object);
 
 #endif

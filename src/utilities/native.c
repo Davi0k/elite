@@ -4,7 +4,6 @@
 #include <time.h>
 
 #include "utilities/native.h"
-#include "helpers/error.h"
 #include "types/object.h"
 
 static Value error(Handler* handler, const char* message, int count, ...) {

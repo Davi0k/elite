@@ -1,19 +1,17 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "vm.h"
-#include "utilities/memory.h"
-#include "utilities/table.h"
 #include "types/object.h"
-#include "types/value.h"
+#include "utilities/memory.h"
 #include "helpers/hash.h"
 
 #define ALLOCATE_OBJECT(vm, object, type) \
   (object*)allocate_object(vm, sizeof(object), type)
 
 static Object* allocate_object(VM* vm, size_t size, Objects type) {
-  Object* object = (Object*)reallocate(NULL, 0, size);
+  Object* object = (Object*)reallocate(vm, NULL, 0, size);
   object->type = type;
+  object->mark = false;
 
   object->next = vm->objects;
   vm->objects = object;
@@ -54,7 +52,9 @@ String* allocate_string(VM* vm, const char* content, int length, uint32_t hash) 
 
   string->hash = hash;
 
+  push(&vm->stack, OBJECT(string));
   table_set(&vm->strings, string, UNDEFINED);
+  pop(&vm->stack, 1);
 
   return string;
 }
@@ -66,7 +66,7 @@ String* copy_string(VM* vm, const char* content, int length) {
 
   if (intern != NULL) return intern;
 
-  char* heap = ALLOCATE(char, length + 1);
+  char* heap = ALLOCATE(vm, char, length + 1);
   memcpy(heap, content, length);
   heap[length] = '\0';
 
@@ -79,7 +79,7 @@ String* take_string(VM* vm, const char* content, int length) {
   String* intern = table_find_string(&vm->strings, content, length, hash);
 
   if (intern != NULL) {
-    FREE_ARRAY(char, (char*)content, length + 1);
+    FREE_ARRAY(vm, char, (char*)content, length + 1);
     return intern;
   }
 
@@ -93,7 +93,7 @@ Function* new_function(VM* vm) {
   function->count = 0;
   function->identifier = NULL;
 
-  initialize_chunk(&function->chunk);
+  initialize_chunk(&function->chunk, vm);
 
   return function;
 }
@@ -101,7 +101,7 @@ Function* new_function(VM* vm) {
 Closure* new_closure(VM* vm, Function* function) {
   int count = function->count;
 
-  Upvalue** upvalues = ALLOCATE(Upvalue*, count);
+  Upvalue** upvalues = ALLOCATE(vm, Upvalue*, count);
 
   for (int i = 0; i < count; i++)
     upvalues[i] = NULL;

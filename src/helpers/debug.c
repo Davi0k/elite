@@ -1,10 +1,7 @@
 #include <stdio.h>
 
 #include "helpers/debug.h"
-#include "utilities/chunk.h"
 #include "types/object.h"
-#include "types/value.h"
-#include "tokenizer.h"
 
 static int simple_representation(const char* name, int offset) {
   printf("%s", name); printf("\n");

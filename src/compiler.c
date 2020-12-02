@@ -3,11 +3,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "common.h"
 #include "compiler.h"
 #include "tokenizer.h"
 #include "types/object.h"
-#include "helpers/error.h"
 
 void set_compiler(Parser* parser, Compiler* compiler, Positions position) {
   compiler->enclosing = parser->compiler;
@@ -899,6 +897,8 @@ Function* compile(VM* vm, const char* source) {
   parser.compiler = NULL;
 
   parser.error = false; parser.panic = false;
+
+  vm->parser = &parser;
 
   set_tokenizer(&parser.tokenizer, source);
 

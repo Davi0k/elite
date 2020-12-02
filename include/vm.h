@@ -1,7 +1,11 @@
 #ifndef VM_H
 #define VM_H
 
+#include <stdlib.h>
+
 #include "common.h"
+
+#include "compiler.h"
 #include "utilities/chunk.h"
 #include "utilities/table.h"
 #include "utilities/native.h"
@@ -27,24 +31,27 @@ typedef struct VM {
   int capacity;
   int count;
 
+  size_t allocate, garbage;
+
   Stack stack;
+
+  Table strings, globals;
 
   Upvalue* upvalues;
 
   Object* objects;
 
-  Table strings, globals;
+  Parser* parser;
 } VM;
-
-void native(VM* vm, const char* identifier, Internal internal);
 
 void reset(VM* vm);
 
 void initialize_VM(VM* vm);
 void free_VM(VM* vm);
 
+void native(VM* vm, const char* identifier, Internal internal);
+
 Results interpret(VM* vm, const char* source);
 
-extern Function* compile(VM* vm, const char* source);
 
 #endif

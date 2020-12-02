@@ -1,10 +1,10 @@
 #ifndef DEBUG_H
 #define DEBUG_H
 
+#include "common.h"
+
 #include "utilities/chunk.h"
-#include "types/value.h"
-#include "tokenizer.h"
-#include "vm.h"
+#include "helpers/stack.h"
 
 void disassemble_chunk(Chunk* chunk, const char* name);
 int disassemble_instruction(Chunk* chunk, int offset);

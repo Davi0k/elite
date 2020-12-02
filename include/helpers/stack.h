@@ -2,6 +2,7 @@
 #define STACK_H
 
 #include "common.h"
+
 #include "types/value.h"
 
 #define STACK_DEFAULT_SIZE ( 1024 * 64 )

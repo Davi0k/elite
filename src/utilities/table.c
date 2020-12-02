@@ -1,20 +1,19 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "types/object.h"
-#include "types/value.h"
 #include "utilities/table.h"
 #include "utilities/memory.h"
 
-void initialize_table(Table* table) {
+void initialize_table(Table* table, VM* vm) {
   table->count = 0;
   table->capacity = 0;
   table->entries = NULL;
+
+  table->vm = vm;
 }
 
 void free_table(Table* table) {
-  FREE_ARRAY(Entry, table->entries, table->capacity);
-  initialize_table(table);
+  FREE_ARRAY(table->vm, Entry, table->entries, table->capacity);
 }
 
 static Entry* find_entry(Entry* entries, int capacity, String* key) {
@@ -43,7 +42,7 @@ static Entry* find_entry(Entry* entries, int capacity, String* key) {
 }
 
 static void fix_capacity(Table* table, int capacity) {
-  Entry* entries = ALLOCATE(Entry, capacity);
+  Entry* entries = ALLOCATE(table->vm, Entry, capacity);
 
   for (int i = 0; i < capacity; i++) {
     entries[i].key = NULL;
@@ -63,7 +62,7 @@ static void fix_capacity(Table* table, int capacity) {
     table->count++;
   }
 
-  FREE_ARRAY(Entry, table->entries, table->capacity);
+  FREE_ARRAY(table->vm, Entry, table->entries, table->capacity);
 
   table->entries = entries;
   table->capacity = capacity;
@@ -110,6 +109,15 @@ bool table_delete(Table* table, String* key) {
   entry->value = VOID;
 
   return true;
+}
+
+void table_clear(Table* table) {
+  for (int i = 0; i < table->capacity; i++) {
+    Entry* entry = &table->entries[i];
+
+    if (entry->key != NULL && entry->key->object.mark == false)
+      table_delete(table, entry->key);
+  }
 }
 
 void table_copy(Table* from, Table* to) {

@@ -9,6 +9,8 @@ file(GLOB HELPERS "src/helpers/*.c")
 file(GLOB UTILITIES "src/utilities/*.c")
 file(GLOB TYPES "src/types/*.c")
 
+add_definitions("-O3")
+
 add_executable(elite ${SOURCES} ${HELPERS} ${UTILITIES} ${TYPES})
 
 target_link_libraries(elite gmp)

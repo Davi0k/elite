@@ -44,9 +44,11 @@ typedef struct {
   int capacity;
   int count;
   Value* values;
+
+  VM* vm;
 } Constants;
 
-void initialize_constants(Constants* constants);
+void initialize_constants(Constants* constants, VM* vm);
 void free_constants(Constants* constants);
 void write_constants(Constants* constants, Value value);
 

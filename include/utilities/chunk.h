@@ -2,6 +2,7 @@
 #define CHUNK_H
 
 #include "common.h"
+
 #include "types/value.h"
 
 #define FOREACH(OPERATION) \
@@ -45,7 +46,7 @@ typedef struct {
   Constants constants;
 } Chunk;
 
-void initialize_chunk(Chunk* chunk);
+void initialize_chunk(Chunk* chunk, VM* vm);
 void free_chunk(Chunk* chunk);
 void write_chunk(Chunk* chunk, uint8_t byte, int line);
 
