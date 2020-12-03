@@ -5,6 +5,7 @@
 
 #include "vm.h"
 #include "utilities/native.h"
+#include "utilities/table.h"
 #include "types/value.h"
 
 #define GMP_NEUTRAL(vm) ( OBJECT(allocate_number_from_double(vm, 1.0)) )
@@ -19,6 +20,7 @@
 #define IS_FUNCTION(value) validate(value, OBJECT_FUNCTION)
 #define IS_CLOSURE(value) validate(value, OBJECT_CLOSURE)
 #define IS_CLASS(value) validate(value, OBJECT_CLASS)
+#define IS_INSTANCE(value) validate(value, OBJECT_INSTANCE)
 #define IS_NATIVE(value) validate(value, OBJECT_NATIVE)
 
 #define AS_NUMBER(value) ( ( (Number*)AS_OBJECT(value) ) )
@@ -26,6 +28,7 @@
 #define AS_FUNCTION(value) ( (Function*)AS_OBJECT(value) )
 #define AS_CLOSURE(value) ( (Closure*)AS_OBJECT(value) )
 #define AS_CLASS(value) ( (Class*)AS_OBJECT(value) )
+#define AS_INSTANCE(value) ( (Instance*)AS_OBJECT(value) )
 #define AS_NATIVE(value) ( ( (Native*)AS_OBJECT(value) )->internal )
 
 typedef enum {
@@ -35,6 +38,7 @@ typedef enum {
   OBJECT_FUNCTION,
   OBJECT_CLOSURE,
   OBJECT_CLASS,
+  OBJECT_INSTANCE,
   OBJECT_NATIVE
 } Objects;
 
@@ -83,6 +87,12 @@ typedef struct Class {
   String* identifier;
 } Class;
 
+typedef struct Instance{
+  Object object;
+  Class* class;
+  Table fields;
+} Instance;
+
 typedef struct Native {
   Object object;
   Internal internal;
@@ -105,6 +115,8 @@ Function* new_function(VM* vm);
 Closure* new_closure(VM* vm, Function* function);
 
 Class* new_class(VM* vm, String* identifier);
+
+Instance* new_instance(VM* vm, Class* class);
 
 Native* new_native(VM* vm, Internal internal);
 

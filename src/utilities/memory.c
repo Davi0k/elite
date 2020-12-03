@@ -75,12 +75,6 @@ void traverse(VM* vm, Parents* parents) {
         break;
       }
 
-      case OBJECT_CLASS: {
-        Class* class = (Class*)object;
-        mark(parents, OBJECT(class->identifier));
-        break;
-      }
-
       case OBJECT_FUNCTION: {
         Function* function = (Function*)object;
 
@@ -103,6 +97,24 @@ void traverse(VM* vm, Parents* parents) {
           mark(parents, OBJECT(closure->upvalues[i]));
 
         break;
+      }
+
+      case OBJECT_CLASS: {
+        Class* class = (Class*)object;
+        mark(parents, OBJECT(class->identifier));
+        break;
+      }
+
+      case OBJECT_INSTANCE: {
+        Instance* instance = (Instance*)object;
+
+        mark(parents, OBJECT(instance->class));
+
+        for (int i = 0; i < instance->fields.capacity; i++) {
+          Entry* entry = &instance->fields.entries[i];
+          mark(parents, OBJECT(entry->key));
+          mark(parents, entry->value);
+        }
       }
     }
   }
@@ -196,6 +208,13 @@ void free_object(VM* vm, Object* object) {
       FREE(vm, Class, object);
       break;
     }
+
+    case OBJECT_INSTANCE: {
+      Instance* instance = (Instance*)object;
+      free_table(&instance->fields);
+      FREE(vm, Instance, object);
+      break;
+    } 
 
     case OBJECT_NATIVE: {
       FREE(vm, Native, object);

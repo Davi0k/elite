@@ -72,6 +72,8 @@ static void function(Parser* parser, bool assign);
 
 static void call(Parser* parser, bool assign);
 
+static void dot(Parser* parser, bool assign);
+
 static void block(Parser* parser);
 static void statement(Parser* parser);
 static void instruction(Parser* parser);
@@ -114,7 +116,7 @@ Rule rules[] = {
 
   [ TOKEN_COMMA ] = { NULL, NULL, PRECEDENCE_NONE },
   [ TOKEN_COLON ] = { NULL, NULL, PRECEDENCE_NONE },
-  [ TOKEN_DOT ] = { NULL, NULL, PRECEDENCE_NONE },
+  [ TOKEN_DOT ] = { NULL, dot,  PRECEDENCE_CALL },
 
   [ TOKEN_OPEN_PARENTHESES ] = { grouping, call, PRECEDENCE_CALL },
   [ TOKEN_CLOSE_PARENTHESES ] = { NULL, NULL, PRECEDENCE_NONE },
@@ -662,8 +664,10 @@ static void declare(Parser* parser, bool force) {
   
   initialize(parser, global, force);
 
-  consume(parser, TOKEN_OPEN_BRACES, compile_time_errors[EXPECT_OPEN_CLASS]);
-  consume(parser, TOKEN_CLOSE_BRACES, compile_time_errors[EXPECT_CLOSE_CLASS]);
+  if (match(parser, TOKEN_SEMICOLON) == false) {
+    consume(parser, TOKEN_OPEN_BRACES, compile_time_errors[EXPECT_OPEN_CLASS]);
+    consume(parser, TOKEN_CLOSE_BRACES, compile_time_errors[EXPECT_CLOSE_CLASS]);
+  }
 }
 
 static void block(Parser* parser) {
@@ -697,6 +701,22 @@ static void call(Parser* parser, bool assign) {
 
   emit(parser, OP_CALL);
   emit(parser, count);
+}
+
+static void dot(Parser* parser, bool assign) {
+  consume(parser, TOKEN_IDENTIFIER, compile_time_errors[EXPECT_PROPERTY_NAME]);
+
+  uint8_t property = identifier(parser, &parser->previous);
+
+  if (assign && match(parser, TOKEN_ASSIGN)) {
+    expression(parser);
+    emit(parser, OP_PROPERTY_SET);
+    emit(parser, property);
+  }
+  else {
+    emit(parser, OP_PROPERTY_GET);
+    emit(parser, property);
+  }
 }
 
 static void conditional(Parser* parser) {

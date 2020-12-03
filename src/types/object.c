@@ -120,6 +120,15 @@ Class* new_class(VM* vm, String* identifier) {
   return class;
 }
 
+Instance* new_instance(VM* vm, Class* class) {
+  Instance* instance = ALLOCATE_OBJECT(vm, Instance, OBJECT_INSTANCE);
+  instance->class = class;
+
+  initialize_table(&instance->fields, vm);
+
+  return instance;
+}
+
 Native* new_native(VM* vm, Internal internal) {
   Native* native = ALLOCATE_OBJECT(vm, Native, OBJECT_NATIVE);
   native->internal = internal;
@@ -147,6 +156,8 @@ void print_object(Value value) {
     case OBJECT_CLOSURE: printf("<Closure Function %s>", AS_CLOSURE(value)->function->identifier->content); break;
 
     case OBJECT_CLASS: printf("<Class %s>", AS_CLASS(value)->identifier->content); break;
+
+    case OBJECT_INSTANCE: printf("<Instance of %s>", AS_INSTANCE(value)->class->identifier->content); break;
 
     case OBJECT_NATIVE: printf("<Native>"); break;
   }

@@ -33,7 +33,8 @@ const char* compile_time_errors[] = {
   [EXPECT_SET_DEFINE_CLASS] = "Expect 'set', 'define' or 'class' statement after 'global' modifier.",
   [EXPECT_CLASS_IDENTIFIER] = "Expect Class identifier.",
   [EXPECT_OPEN_CLASS] = "Expect '{' before Class body.",
-  [EXPECT_CLOSE_CLASS] = "Expect '}' after Class body."
+  [EXPECT_CLOSE_CLASS] = "Expect '}' after Class body.",
+  [EXPECT_PROPERTY_NAME] = "Expect property identifier."
 };
 
 const char* run_time_errors[] = {
@@ -48,7 +49,9 @@ const char* run_time_errors[] = {
   [MUST_BE_NUMBERS_OR_STRINGS] = "Operands must be two Numbers or two Strings.",
   [UNDEFINED_VARIABLE] = "Undefined variable '%s'.",
   [UNDEFINED_ERROR] = "Undefined Error Message.",
-  [MUST_INCLUDE_STRING] = "Expect String after 'include' statement."
+  [MUST_INCLUDE_STRING] = "Expect String after 'include' statement.",
+  [CANNOT_HAVE_PROPERTIES] = "Only instances can have properties.",
+  [UNDEFINED_PROPERTY] = "Undefined property '%s'."
 };
 
 const char* read_file_errors[] = {

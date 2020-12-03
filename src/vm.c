@@ -147,6 +147,12 @@ static bool call(VM* vm, Value value, int count) {
       case OBJECT_CLOSURE:
         return invoke(vm, AS_CLOSURE(value), count);
 
+      case OBJECT_CLASS: {
+        Class* class = AS_CLASS(value);
+        vm->stack.top[- count - 1] = OBJECT(new_instance(vm, class));
+        return true;
+      }
+
       case OBJECT_NATIVE: {
         Handler handler;
 
@@ -169,6 +175,8 @@ static bool call(VM* vm, Value value, int count) {
   }
 
   error(vm, run_time_errors[CANNOT_CALL]);
+
+  return false;
 }
 
 static Upvalue* capture(VM* vm, Value* local) {
@@ -547,11 +555,57 @@ static Results run(VM* vm) {
   }
 
   OP_CLASS: {
-    Class* class = new_class(vm, AS_STRING(READ_CONSTANT()));
+    String* identifier = AS_STRING(READ_CONSTANT());
+
+    Class* class = new_class(vm, identifier);
 
     push(&vm->stack, OBJECT(class));
 
     COMPUTE_NEXT();
+  }
+
+  OP_PROPERTY_SET: {
+    if (IS_INSTANCE(peek(&vm->stack, 1)) == false) {
+      error(vm, run_time_errors[CANNOT_HAVE_PROPERTIES]);
+
+      return INTERPRET_RUNTIME_ERROR;
+    }
+
+    Instance* instance = AS_INSTANCE(peek(&vm->stack, 1));
+
+    String* property = AS_STRING(READ_CONSTANT());
+
+    table_set(&instance->fields, property, peek(&vm->stack, 0));
+
+    Value value = pop(&vm->stack, 1);
+    pop(&vm->stack, 1);
+    push(&vm->stack, value);
+
+    COMPUTE_NEXT();
+  }
+
+  OP_PROPERTY_GET: {
+    if (IS_INSTANCE(peek(&vm->stack, 0)) == false) {
+      error(vm, run_time_errors[CANNOT_HAVE_PROPERTIES]);
+
+      return INTERPRET_RUNTIME_ERROR;
+    }
+
+    Instance* instance = AS_INSTANCE(peek(&vm->stack, 0));
+
+    String* property = AS_STRING(READ_CONSTANT());
+
+    Value value;
+
+    if (table_get(&instance->fields, property, &value)) {
+      pop(&vm->stack, 1);
+      push(&vm->stack, value);
+      COMPUTE_NEXT();
+    }
+
+    error(vm, run_time_errors[UNDEFINED_PROPERTY], property->content);
+
+    return INTERPRET_RUNTIME_ERROR;
   }
 
   OP_EMPTY: COMPUTE_NEXT();
