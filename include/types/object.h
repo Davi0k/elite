@@ -3,9 +3,9 @@
 
 #include "common.h"
 
-#include "vm.h"
 #include "utilities/native.h"
 #include "utilities/table.h"
+#include "utilities/chunk.h"
 #include "types/value.h"
 
 #define GMP_NEUTRAL(vm) ( OBJECT(allocate_number_from_double(vm, 1.0)) )
@@ -13,6 +13,7 @@
 #define OBJECT_TYPE(value) ( AS_OBJECT(value)->type )
 
 #define NUMBER(vm, value) ( OBJECT(allocate_number(vm, value))  )
+
 #define STRING(vm, content, length) ( OBJECT(copy_string(vm, content, length)) )
 
 #define IS_NUMBER(value) validate(value, OBJECT_NUMBER)
@@ -23,13 +24,13 @@
 #define IS_INSTANCE(value) validate(value, OBJECT_INSTANCE)
 #define IS_NATIVE(value) validate(value, OBJECT_NATIVE)
 
-#define AS_NUMBER(value) ( ( (Number*)AS_OBJECT(value) ) )
+#define AS_NUMBER(value) ( (Number*)AS_OBJECT(value) )
 #define AS_STRING(value) ( (String*)AS_OBJECT(value) )
 #define AS_FUNCTION(value) ( (Function*)AS_OBJECT(value) )
 #define AS_CLOSURE(value) ( (Closure*)AS_OBJECT(value) )
 #define AS_CLASS(value) ( (Class*)AS_OBJECT(value) )
 #define AS_INSTANCE(value) ( (Instance*)AS_OBJECT(value) )
-#define AS_NATIVE(value) ( ( (Native*)AS_OBJECT(value) )->internal )
+#define AS_NATIVE(value) ( (Native*)AS_OBJECT(value) )
 
 typedef enum {
   OBJECT_UPVALUE,
@@ -100,10 +101,10 @@ typedef struct Native {
 
 Upvalue* new_upvalue(VM* vm, Value* location);
 
-Number* allocate_number(VM* vm, mpf_t number);
+Number* allocate_number(VM* vm, mpf_t value);
 
-Number* allocate_number_from_double(VM* vm, double number);
-Number* allocate_number_from_string(VM* vm, const char* number);
+Number* allocate_number_from_double(VM* vm, double value);
+Number* allocate_number_from_string(VM* vm, const char* value);
 
 String* allocate_string(VM* vm, const char* content, int length, uint32_t hash);
 

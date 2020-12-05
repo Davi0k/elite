@@ -3,11 +3,21 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "compiler.h"
+#include "vm.h"
 #include "tokenizer.h"
 #include "types/object.h"
 
-void set_compiler(Parser* parser, Compiler* compiler, Positions position) {
+#define GET_CURRENT_CHUNK(compiler) \
+  ( &compiler->function->chunk )
+
+#define EMIT_BYTE(parser, byte) \
+  do { \
+    Chunk* chunk = GET_CURRENT_CHUNK(parser->compiler); \
+    int line = parser->previous.line; \
+    write_chunk(chunk, byte, line); \
+  } while(false)
+
+static void set_compiler(Parser* parser, Compiler* compiler, Positions position) {
   compiler->enclosing = parser->compiler;
 
   compiler->function = NULL;
@@ -30,30 +40,22 @@ void set_compiler(Parser* parser, Compiler* compiler, Positions position) {
   local->identifier.length = 0;
 }
 
-static inline Chunk* get_current_chunk(Compiler* compiler) {
-  return &compiler->function->chunk;
-}
+static void stream(Parser* parser, int count, ...) {
+  va_list list;
 
-static void emit(Parser* parser, uint8_t byte) {
-  write_chunk(get_current_chunk(parser->compiler), byte, parser->previous.line);
-}
+  va_start(list, count);
 
-static void close(Parser* parser) {
-  emit(parser, OP_UNDEFINED);
-  emit(parser, OP_RETURN);
-}
+  for (int i = 0; i < count; i++) {
+    uint8_t byte = (uint8_t)va_arg(list, int);
 
-static Function* terminate_compiler(Parser* parser) {
-  close(parser);
+    EMIT_BYTE(parser, byte);
+  }
 
-  Function* function = parser->compiler->function;
-
-  parser->compiler = parser->compiler->enclosing;
-
-  return function;
+  va_end(list);
 }
 
 static void espression(Parser* parser);
+
 static void parse(Parser* parser, Precedences precedence);
 
 static void grouping(Parser* parser, bool assign);
@@ -72,7 +74,7 @@ static void function(Parser* parser, bool assign);
 
 static void call(Parser* parser, bool assign);
 
-static void dot(Parser* parser, bool assign);
+static void accessor(Parser* parser, bool assign);
 
 static void block(Parser* parser);
 static void statement(Parser* parser);
@@ -116,7 +118,7 @@ Rule rules[] = {
 
   [ TOKEN_COMMA ] = { NULL, NULL, PRECEDENCE_NONE },
   [ TOKEN_COLON ] = { NULL, NULL, PRECEDENCE_NONE },
-  [ TOKEN_DOT ] = { NULL, dot,  PRECEDENCE_CALL },
+  [ TOKEN_DOT ] = { NULL, accessor,  PRECEDENCE_CALL },
 
   [ TOKEN_OPEN_PARENTHESES ] = { grouping, call, PRECEDENCE_CALL },
   [ TOKEN_CLOSE_PARENTHESES ] = { NULL, NULL, PRECEDENCE_NONE },
@@ -149,6 +151,17 @@ Rule rules[] = {
 
   [ TOKEN_SEMICOLON ] = { NULL, NULL, PRECEDENCE_NONE}
 };
+
+static Function* terminate(Parser* parser) {
+  EMIT_BYTE(parser, OP_UNDEFINED);
+  EMIT_BYTE(parser, OP_RETURN);
+
+  Function* function = parser->compiler->function;
+
+  parser->compiler = parser->compiler->enclosing;
+
+  return function;
+}
 
 static void error(Parser* parser, Token token, const char* error) {
   if (parser->panic) return;
@@ -192,21 +205,8 @@ static bool match(Parser* parser, Types type) {
   return true;
 }
 
-static void stream(Parser* parser, int count, ...) {
-  va_list list;
-
-  va_start(list, count);
-
-  for (int i = 0; i < count; i++) {
-    uint8_t byte = (uint8_t)va_arg(list, int);
-    emit(parser, byte);
-  }
-
-  va_end(list);
-}
-
 static uint8_t make(Parser* parser, Value value) {
-  int constant = add_constant(get_current_chunk(parser->compiler), value);
+  int constant = add_constant(GET_CURRENT_CHUNK(parser->compiler), value);
 
   if (constant > UINT8_MAX) {
     error(parser, parser->previous, compile_time_errors[TOO_MANY_CONSTANTS]);
@@ -219,8 +219,8 @@ static uint8_t make(Parser* parser, Value value) {
 static void constant(Parser* parser, Value value) {
   uint8_t constant = make(parser, value);
 
-  emit(parser, OP_CONSTANT);
-  emit(parser, constant);
+  EMIT_BYTE(parser, OP_CONSTANT);
+  EMIT_BYTE(parser, constant);
 }
 
 static void number(Parser* parser, bool assign) {
@@ -247,12 +247,12 @@ static void string(Parser* parser, bool assign) {
 
 static void literal(Parser* parser, bool assign) {
   switch (parser->previous.type) {
-    case TOKEN_TRUE: emit(parser, OP_TRUE); break;
-    case TOKEN_FALSE: emit(parser, OP_FALSE); break;
+    case TOKEN_TRUE: EMIT_BYTE(parser, OP_TRUE); break;
+    case TOKEN_FALSE: EMIT_BYTE(parser, OP_FALSE); break;
 
-    case TOKEN_VOID: emit(parser, OP_VOID); break;
+    case TOKEN_VOID: EMIT_BYTE(parser, OP_VOID); break;
 
-    case TOKEN_UNDEFINED: emit(parser, OP_UNDEFINED); break;
+    case TOKEN_UNDEFINED: EMIT_BYTE(parser, OP_UNDEFINED); break;
 
     default: return;
   }
@@ -274,9 +274,9 @@ static void unary(Parser* parser, bool assign) {
   parse(parser, PRECEDENCE_UNARY);
 
   switch (operator) {
-    case TOKEN_MINUS: emit(parser, OP_NEGATION); break;
+    case TOKEN_MINUS: EMIT_BYTE(parser, OP_NEGATION); break;
 
-    case TOKEN_NOT: emit(parser, OP_NOT); break;
+    case TOKEN_NOT: EMIT_BYTE(parser, OP_NOT); break;
 
     default: return;
   }
@@ -292,19 +292,19 @@ static void binary(Parser* parser, bool assign) {
   parse(parser, precedence);
 
   switch (operator) {
-    case TOKEN_PLUS: emit(parser, OP_ADD); break;
-    case TOKEN_MINUS: emit(parser, OP_SUBTRACT); break;
-    case TOKEN_ASTERISK: emit(parser, OP_MULTIPLY); break;
-    case TOKEN_SLASH: emit(parser, OP_DIVIDE); break;
+    case TOKEN_PLUS: EMIT_BYTE(parser, OP_ADD); break;
+    case TOKEN_MINUS: EMIT_BYTE(parser, OP_SUBTRACT); break;
+    case TOKEN_ASTERISK: EMIT_BYTE(parser, OP_MULTIPLY); break;
+    case TOKEN_SLASH: EMIT_BYTE(parser, OP_DIVIDE); break;
 
-    case TOKEN_CARET: emit(parser, OP_POWER); break;
+    case TOKEN_CARET: EMIT_BYTE(parser, OP_POWER); break;
 
-    case TOKEN_EQUAL: emit(parser, OP_EQUAL); break;
+    case TOKEN_EQUAL: EMIT_BYTE(parser, OP_EQUAL); break;
     case TOKEN_NOT_EQUAL: stream(parser, 2, OP_EQUAL, OP_NOT); break;
 
-    case TOKEN_GREATER: emit(parser, OP_GREATER); break;
+    case TOKEN_GREATER: EMIT_BYTE(parser, OP_GREATER); break;
     case TOKEN_GREATER_EQUAL: stream(parser, 2, OP_LESS, OP_NOT); break;
-    case TOKEN_LESS: emit(parser, OP_LESS); break;
+    case TOKEN_LESS: EMIT_BYTE(parser, OP_LESS); break;
     case TOKEN_LESS_EQUAL: stream(parser, 2, OP_GREATER, OP_NOT); break;
 
     default: return;
@@ -344,7 +344,7 @@ static uint8_t identifier(Parser* parser, Token* token) {
 }
 
 static void local(Parser* parser, Token identifier) {
-  if (parser->compiler->count == UINT8_COUNT) {
+  if (parser->compiler->count == MAXIMUM_BOUND) {
     error(parser, parser->previous, compile_time_errors[TOO_MANY_LOCALS]);
     return;
   }
@@ -380,7 +380,7 @@ static int up(Parser* parser, Compiler* compiler, uint8_t index, bool local) {
       return i;
   }
 
-  if (count == UINT8_COUNT) {
+  if (count == MAXIMUM_BOUND) {
     error(parser, parser->previous, compile_time_errors[TOO_MANY_CLOSURE_VARIABLES]);
     return 0;
   }
@@ -418,8 +418,8 @@ static void mark(Parser* parser, bool force) {
 
 static void initialize(Parser* parser, uint8_t global, bool force) {
   if (parser->compiler->scope == 0 || force == true) {
-    emit(parser, OP_GLOBAL_INITIALIZE);
-    emit(parser, global);
+    EMIT_BYTE(parser, OP_GLOBAL_INITIALIZE);
+    EMIT_BYTE(parser, global);
   }
   else mark(parser, force);
 }
@@ -464,10 +464,10 @@ static void end(Parser* parser) {
 
   while (compiler->count > 0 && compiler->locals[compiler->count - 1].depth > compiler->scope) {
     if (compiler->locals[compiler->count - 1].captured) {
-      emit(parser, OP_POP_N);
-      emit(parser, counter);
+      EMIT_BYTE(parser, OP_POP_N);
+      EMIT_BYTE(parser, counter);
 
-      emit(parser, OP_CLOSE);
+      EMIT_BYTE(parser, OP_CLOSE);
 
       counter = 0;
     }
@@ -476,8 +476,8 @@ static void end(Parser* parser) {
     compiler->count--;
   }
 
-  emit(parser, OP_POP_N);
-  emit(parser, counter);
+  EMIT_BYTE(parser, OP_POP_N);
+  EMIT_BYTE(parser, counter);
 }
 
 static void variable(Parser* parser, bool assign) {
@@ -509,27 +509,27 @@ static void variable(Parser* parser, bool assign) {
     operation = setter;
   }
   else if (assign && match(parser, TOKEN_INCREMENT)) {
-    emit(parser, getter);
-    emit(parser, argument);
+    EMIT_BYTE(parser, getter);
+    EMIT_BYTE(parser, argument);
 
     constant(parser, GMP_NEUTRAL(parser->vm));
 
-    emit(parser, OP_ADD);
+    EMIT_BYTE(parser, OP_ADD);
     operation = setter;
   }
   else if (assign && match(parser, TOKEN_DECREMENT)) {
-    emit(parser, getter);
-    emit(parser, argument);
+    EMIT_BYTE(parser, getter);
+    EMIT_BYTE(parser, argument);
 
     constant(parser, GMP_NEUTRAL(parser->vm));
 
-    emit(parser, OP_SUBTRACT);
+    EMIT_BYTE(parser, OP_SUBTRACT);
     operation = setter;
   }
   else operation = getter;
 
-  emit(parser, operation);
-  emit(parser, argument);
+  EMIT_BYTE(parser, operation);
+  EMIT_BYTE(parser, argument);
 }
 
 static void function(Parser* parser, bool assign) {
@@ -562,10 +562,10 @@ static void function(Parser* parser, bool assign) {
     block(parser);
   else {
     expression(parser);
-    emit(parser, OP_RETURN);
+    EMIT_BYTE(parser, OP_RETURN);
   }
 
-  Function* function = terminate_compiler(parser);
+  Function* function = terminate(parser);
 
   if (assign == true)
     function->identifier = NULL;
@@ -573,46 +573,46 @@ static void function(Parser* parser, bool assign) {
   stream(parser, 2, OP_CLOSURE, make(parser, OBJECT(function)));
 
   for (int i = 0; i < function->count; i++) {
-    emit(parser, compiler.ups[i].local ? 1 : 0);
-    emit(parser, compiler.ups[i].index);
+    EMIT_BYTE(parser, compiler.ups[i].local ? 1 : 0);
+    EMIT_BYTE(parser, compiler.ups[i].index);
   }
 }
 
-static int jump(Parser* parser, uint8_t instruction) {
-  emit(parser, instruction);
-
-  emit(parser, 0xff);
-  emit(parser, 0xff);
-
-  return get_current_chunk(parser->compiler)->count - 2;
-}
-
 static void patch(Parser* parser, int offset) {
-  int jump = get_current_chunk(parser->compiler)->count - offset - 2;
+  int jump = GET_CURRENT_CHUNK(parser->compiler)->count - offset - 2;
 
   if (jump > UINT16_MAX)
     error(parser, parser->previous, compile_time_errors[MAXIMUM_JUMP_BODY]);
 
-  get_current_chunk(parser->compiler)->code[offset] = (jump >> 8) & 0xff;
-  get_current_chunk(parser->compiler)->code[offset + 1] = jump & 0xff;
+  GET_CURRENT_CHUNK(parser->compiler)->code[offset] = (jump >> 8) & 0xff;
+  GET_CURRENT_CHUNK(parser->compiler)->code[offset + 1] = jump & 0xff;
+}
+
+static int jump(Parser* parser, uint8_t instruction) {
+  EMIT_BYTE(parser, instruction);
+
+  EMIT_BYTE(parser, 0xff);
+  EMIT_BYTE(parser, 0xff);
+
+  return GET_CURRENT_CHUNK(parser->compiler)->count - 2;
 }
 
 static void loop(Parser* parser, int start) {
-  emit(parser, OP_LOOP);
+  EMIT_BYTE(parser, OP_LOOP);
 
-  int offset = get_current_chunk(parser->compiler)->count - start + 2;
+  int offset = GET_CURRENT_CHUNK(parser->compiler)->count - start + 2;
 
   if (offset > UINT16_MAX) 
-    error(parser, parser->previous, compile_time_errors[MINIMUM_LOOP_BODY]);
+    error(parser, parser->previous, compile_time_errors[MINIMUM_CAPACITY_LOOP_BODY]);
 
-  emit(parser, (offset >> 8) & 0xff);
-  emit(parser, offset & 0xff);
+  EMIT_BYTE(parser, (offset >> 8) & 0xff);
+  EMIT_BYTE(parser, offset & 0xff);
 }
 
 static void and(Parser* parser, bool assign) {
   int end = jump(parser, OP_JUMP_CONDITIONAL);
 
-  emit(parser, OP_POP);
+  EMIT_BYTE(parser, OP_POP);
 
   parse(parser, PRECEDENCE_AND);
 
@@ -626,7 +626,7 @@ static void or(Parser* parser, bool assign) {
 
   patch(parser, otherwise);
 
-  emit(parser, OP_POP);
+  EMIT_BYTE(parser, OP_POP);
 
   parse(parser, PRECEDENCE_OR);
 
@@ -639,7 +639,7 @@ static void set(Parser* parser, bool force) {
 
     if (match(parser, TOKEN_COLON))
       expression(parser);
-    else emit(parser, OP_UNDEFINED);
+    else EMIT_BYTE(parser, OP_UNDEFINED);
 
     initialize(parser, global, force);
   } while(match(parser, TOKEN_COMMA));
@@ -654,13 +654,13 @@ static void define(Parser* parser, bool force) {
   initialize(parser, global, force);
 }
 
-static void declare(Parser* parser, bool force) {
+static void class(Parser* parser, bool force) {
   consume(parser, TOKEN_IDENTIFIER, compile_time_errors[EXPECT_CLASS_IDENTIFIER]);
   uint8_t global = identifier(parser, &parser->previous);
   declaration(parser, force);
 
-  emit(parser, OP_CLASS);
-  emit(parser, global);
+  EMIT_BYTE(parser, OP_CLASS);
+  EMIT_BYTE(parser, global);
   
   initialize(parser, global, force);
 
@@ -699,23 +699,23 @@ static uint8_t arguments(Parser* parser) {
 static void call(Parser* parser, bool assign) {
   uint8_t count = arguments(parser);
 
-  emit(parser, OP_CALL);
-  emit(parser, count);
+  EMIT_BYTE(parser, OP_CALL);
+  EMIT_BYTE(parser, count);
 }
 
-static void dot(Parser* parser, bool assign) {
+static void accessor(Parser* parser, bool assign) {
   consume(parser, TOKEN_IDENTIFIER, compile_time_errors[EXPECT_PROPERTY_NAME]);
 
   uint8_t property = identifier(parser, &parser->previous);
 
   if (assign && match(parser, TOKEN_ASSIGN)) {
     expression(parser);
-    emit(parser, OP_PROPERTY_SET);
-    emit(parser, property);
+    EMIT_BYTE(parser, OP_PROPERTY_SET);
+    EMIT_BYTE(parser, property);
   }
   else {
-    emit(parser, OP_PROPERTY_GET);
-    emit(parser, property);
+    EMIT_BYTE(parser, OP_PROPERTY_GET);
+    EMIT_BYTE(parser, property);
   }
 }
 
@@ -726,7 +726,7 @@ static void conditional(Parser* parser) {
 
   int then = jump(parser, OP_JUMP_CONDITIONAL);
 
-  emit(parser, OP_POP);
+  EMIT_BYTE(parser, OP_POP);
 
   statement(parser);
 
@@ -734,7 +734,7 @@ static void conditional(Parser* parser) {
 
   patch(parser, then);
 
-  emit(parser, OP_POP);
+  EMIT_BYTE(parser, OP_POP);
 
   if (match(parser, TOKEN_ELSE)) {
     consume(parser, TOKEN_COLON, compile_time_errors[EXPECT_COLON_STATEMENT]);
@@ -746,7 +746,7 @@ static void conditional(Parser* parser) {
 }
 
 static void iterative(Parser* parser) {
-  int start = get_current_chunk(parser->compiler)->count;
+  int start = GET_CURRENT_CHUNK(parser->compiler)->count;
 
   expression(parser);
 
@@ -754,7 +754,7 @@ static void iterative(Parser* parser) {
 
   int exit = jump(parser, OP_JUMP_CONDITIONAL);
 
-  emit(parser, OP_POP);
+  EMIT_BYTE(parser, OP_POP);
 
   statement(parser);
 
@@ -762,11 +762,11 @@ static void iterative(Parser* parser) {
 
   patch(parser, exit);
 
-  emit(parser, OP_POP);
+  EMIT_BYTE(parser, OP_POP);
 }
 
 static void repeat(Parser* parser) {
-  int start = get_current_chunk(parser->compiler)->count;
+  int start = GET_CURRENT_CHUNK(parser->compiler)->count;
 
   statement(parser);
 
@@ -776,13 +776,13 @@ static void repeat(Parser* parser) {
 
   int exit = jump(parser, OP_JUMP_CONDITIONAL);
 
-  emit(parser, OP_POP);
+  EMIT_BYTE(parser, OP_POP);
 
   loop(parser, start);
 
   patch(parser, exit);
 
-  emit(parser, OP_POP);
+  EMIT_BYTE(parser, OP_POP);
 }
 
 static void looping(Parser* parser) {
@@ -799,7 +799,7 @@ static void looping(Parser* parser) {
     }
   }
 
-  int start = get_current_chunk(parser->compiler)->count;
+  int start = GET_CURRENT_CHUNK(parser->compiler)->count;
 
   int exit = -1;
 
@@ -810,17 +810,17 @@ static void looping(Parser* parser) {
 
     exit = jump(parser, OP_JUMP_CONDITIONAL);
 
-    emit(parser, OP_POP);
+    EMIT_BYTE(parser, OP_POP);
   }
 
   if (match(parser, TOKEN_CLOSE_PARENTHESES) == false) {
     int body = jump(parser, OP_JUMP);
 
-    int increment = get_current_chunk(parser->compiler)->count;
+    int increment = GET_CURRENT_CHUNK(parser->compiler)->count;
 
     expression(parser);
 
-    emit(parser, OP_POP);
+    EMIT_BYTE(parser, OP_POP);
 
     consume(parser, TOKEN_CLOSE_PARENTHESES, compile_time_errors[EXPECT_CLOSE_FOR]);
 
@@ -837,7 +837,7 @@ static void looping(Parser* parser) {
 
   if (exit >= 0) {
     patch(parser, exit);
-    emit(parser, OP_POP);
+    EMIT_BYTE(parser, OP_POP);
   }
 
   end(parser);
@@ -863,23 +863,25 @@ static void statement(Parser* parser) {
     if (parser->compiler->position == POSITION_SCRIPT)
       error(parser, parser->previous, compile_time_errors[CANNOT_RETURN_SCRIPT]);
 
-    if (match(parser, TOKEN_SEMICOLON) == false) {
+    if (check(parser, TOKEN_SEMICOLON) == false) 
       expression(parser);
-      consume(parser, TOKEN_SEMICOLON, compile_time_errors[EXPECT_SEMICOLON]);
-      emit(parser, OP_RETURN);
-    } else close(parser);
+    else EMIT_BYTE(parser, OP_UNDEFINED);
+
+    consume(parser, TOKEN_SEMICOLON, compile_time_errors[EXPECT_SEMICOLON]);
+
+    EMIT_BYTE(parser, OP_RETURN);
   }
   else if (match(parser, TOKEN_EMPTY)) {
-    emit(parser, OP_EMPTY);
+    EMIT_BYTE(parser, OP_EMPTY);
     consume(parser, TOKEN_SEMICOLON, compile_time_errors[EXPECT_SEMICOLON]);
   }
   else if (match(parser, TOKEN_EXIT)) {
-    emit(parser, OP_EXIT);
+    EMIT_BYTE(parser, OP_EXIT);
     consume(parser, TOKEN_SEMICOLON, compile_time_errors[EXPECT_SEMICOLON]);
   }
   else {
     expression(parser);
-    emit(parser, OP_POP);
+    EMIT_BYTE(parser, OP_POP);
     consume(parser, TOKEN_SEMICOLON, compile_time_errors[EXPECT_SEMICOLON]);
   }
 }
@@ -902,7 +904,7 @@ static void instruction(Parser* parser) {
   else if (match(parser, TOKEN_DEFINE) == true)
     define(parser, force);
   else if (match(parser, TOKEN_CLASS) == true)
-    declare(parser, force);
+    class(parser, force);
   else statement(parser);
 
   if (parser->panic) 
@@ -942,20 +944,18 @@ Function* compile(VM* vm, const char* source) {
 
   parser.error = false; parser.panic = false;
 
-  vm->parser = &parser;
-
   set_tokenizer(&parser.tokenizer, source);
+
+  advance(&parser);
 
   Compiler compiler;
 
   set_compiler(&parser, &compiler, POSITION_SCRIPT);
-
-  advance(&parser);
   
   while (match(&parser, TOKEN_EOF) == false)
     instruction(&parser);
 
-  Function* function = terminate_compiler(&parser);
+  Function* function = terminate(&parser);
 
   return parser.error ? NULL : function;
 }

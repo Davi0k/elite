@@ -1,5 +1,6 @@
 #include <stdlib.h>
 
+#include "vm.h"
 #include "utilities/chunk.h"
 #include "utilities/memory.h"
 
@@ -26,8 +27,8 @@ void write_chunk(Chunk* chunk, uint8_t byte, int line) {
 
     chunk->capacity = GROW_CAPACITY(capacity);
 
-    chunk->code = GROW_ARRAY(chunk->constants.vm, uint8_t, chunk->code, capacity, chunk->capacity);
-    chunk->lines = GROW_ARRAY(chunk->constants.vm, int, chunk->lines, capacity, chunk->capacity);
+    chunk->code = ALLOCATE_ARRAY(chunk->constants.vm, uint8_t, chunk->code, capacity, chunk->capacity);
+    chunk->lines = ALLOCATE_ARRAY(chunk->constants.vm, int, chunk->lines, capacity, chunk->capacity);
   }
 
   chunk->code[chunk->count] = byte;

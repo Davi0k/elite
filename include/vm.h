@@ -9,7 +9,7 @@
 #include "utilities/chunk.h"
 #include "utilities/table.h"
 #include "utilities/native.h"
-#include "helpers/stack.h"
+#include "types/stack.h"
 #include "types/value.h"
 
 #define FRAME_DEFAULT_SIZE 16
@@ -40,14 +40,12 @@ typedef struct VM {
   Upvalue* upvalues;
 
   Object* objects;
-
-  Parser* parser;
 } VM;
-
-void reset(VM* vm);
 
 void initialize_VM(VM* vm);
 void free_VM(VM* vm);
+
+void reset(VM* vm);
 
 void native(VM* vm, const char* identifier, Internal internal);
 

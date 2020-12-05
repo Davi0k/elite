@@ -3,10 +3,9 @@
 
 #include "common.h"
 
-#include "utilities/table.h"
 #include "types/value.h"
 
-typedef struct VM VM;
+#define LINE_LENGTH_MAX 1024
 
 typedef struct {
   VM* vm;

@@ -23,7 +23,7 @@ void write_constants(Constants* constants, Value value) {
 
     constants->capacity = GROW_CAPACITY(capacity);
 
-    constants->values = GROW_ARRAY(constants->vm, Value, constants->values, capacity, constants->capacity);
+    constants->values = ALLOCATE_ARRAY(constants->vm, Value, constants->values, capacity, constants->capacity);
   }
 
   constants->values[constants->count] = value;

@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "utilities/generic.h"
+#include "helpers/generic.h"
 
 const char* compile_time_errors[] = {
   [TOO_MANY_CONSTANTS] = "Too many Constants in one single Chunk.",
@@ -14,7 +14,7 @@ const char* compile_time_errors[] = {
   [MAXIMUM_PARAMETERS] = "Cannot have more than 255 parameters.",
   [EXPECT_PARAMETER_IDENTIFIER] = "Expect a parameter identifier.",
   [MAXIMUM_JUMP_BODY] = "Too much code to jump over.",
-  [MINIMUM_LOOP_BODY] = "Loop body too large.",
+  [MINIMUM_CAPACITY_LOOP_BODY] = "Loop body too large.",
   [EXPECT_VARIABLE_IDENTIFIER] = "Expect a variable identifier.",
   [EXPECT_SEMICOLON] = "Expect ';' after instruction.",
   [EXPECT_FUNCTION_IDENTIFIER] = "Expect a Function identifier.",
@@ -50,7 +50,7 @@ const char* run_time_errors[] = {
   [UNDEFINED_VARIABLE] = "Undefined variable '%s'.",
   [UNDEFINED_ERROR] = "Undefined Error Message.",
   [MUST_INCLUDE_STRING] = "Expect String after 'include' statement.",
-  [CANNOT_HAVE_PROPERTIES] = "Only instances can have properties.",
+  [CANNOT_HAVE_PROPERTIES] = "Only instances can have fields.",
   [UNDEFINED_PROPERTY] = "Undefined property '%s'."
 };
 
@@ -63,32 +63,35 @@ const char* read_file_errors[] = {
 char* read(const char* path, int* error) {
   FILE* file = fopen(path, "rb");
 
-  if (file == NULL) {
-    error = (int*)CANNOT_OPEN_FILE;
-    return NULL;
-  }
+  if (file) {
+    fseek(file, 0L, SEEK_END);
+    size_t size = ftell(file);
+    rewind(file);
 
-  fseek(file, 0L, SEEK_END);
-  size_t size = ftell(file);
-  rewind(file);
+    char* buffer = (char*)malloc(size + 1);
 
-  char* buffer = (char*)malloc(size + 1);
+    if (buffer) {
+      size_t bytes = fread(buffer, sizeof(char), size, file);
 
-  if (buffer == NULL) {
+      if (bytes >= size) {
+        buffer[bytes] = '\0';
+
+        fclose(file);
+        
+        return buffer;
+      }
+
+      error = (int*)NOT_ENOUGH_MEMORY;
+    
+      return NULL;
+    }
+
     error = (int*)CANNOT_READ_FILE;
+
     return NULL;
   }
 
-  size_t bytes = fread(buffer, sizeof(char), size, file);
+  error = (int*)CANNOT_OPEN_FILE;
 
-  if (bytes < size) {
-    error = (int*)NOT_ENOUGH_MEMORY;
-    return NULL;
-  }
-
-  buffer[bytes] = '\0';
-
-  fclose(file);
-  
-  return buffer;
+  return NULL;
 }

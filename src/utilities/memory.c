@@ -1,3 +1,4 @@
+#include "vm.h"
 #include "compiler.h"
 #include "utilities/memory.h"
 
@@ -54,14 +55,6 @@ void roots(VM* vm, Parents* parents) {
     Entry* entry = &table->entries[i];
     mark(parents, OBJECT(entry->key));
     mark(parents, entry->value);
-  }
-
-  Compiler* compiler = vm->parser->compiler;
-
-  while (compiler != NULL) {
-    mark(parents, OBJECT(compiler->function));
-    
-    compiler = compiler->enclosing;
   }
 }
 

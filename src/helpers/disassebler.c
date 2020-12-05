@@ -1,6 +1,7 @@
 #include <stdio.h>
 
-#include "helpers/debug.h"
+#include "helpers/disassebler.h"
+
 #include "types/object.h"
 
 static int simple_representation(const char* name, int offset) {
@@ -120,14 +121,4 @@ int disassemble_instruction(Chunk* chunk, int offset) {
       printf("Unknown Operation Code %d", instruction); printf("\n");
       return offset + 1;
   }
-}
-
-void print_stack(Stack* stack) {
-  for (Value* slot = stack->content; slot < stack->top; slot++) {
-    printf("[ ");
-    print_value(*slot);
-    printf(" ]");
-  }
-
-  printf("\n");
 }

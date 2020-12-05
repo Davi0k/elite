@@ -1,9 +1,9 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "vm.h"
 #include "types/object.h"
 #include "utilities/memory.h"
-#include "helpers/hash.h"
 
 #define ALLOCATE_OBJECT(vm, object, type) \
   (object*)allocate_object(vm, sizeof(object), type)
@@ -122,6 +122,7 @@ Class* new_class(VM* vm, String* identifier) {
 
 Instance* new_instance(VM* vm, Class* class) {
   Instance* instance = ALLOCATE_OBJECT(vm, Instance, OBJECT_INSTANCE);
+
   instance->class = class;
 
   initialize_table(&instance->fields, vm);

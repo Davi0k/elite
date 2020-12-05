@@ -6,17 +6,6 @@
 #include "vm.h"
 #include "types/object.h"
 #include "utilities/memory.h"
-#include "helpers/stack.h"
-
-void reset(VM* vm) {
-  vm->count = 0;
-  vm->capacity = FRAME_DEFAULT_SIZE;
-  vm->frames = GROW_ARRAY(vm, Frame, vm->frames, 0 , vm->capacity);
-  
-  vm->upvalues = NULL;
-
-  vm->stack.top = vm->stack.content;
-}
 
 void initialize_VM(VM* vm) {
   vm->frames = NULL;
@@ -50,6 +39,16 @@ void free_VM(VM* vm) {
   free_table(&vm->globals); 
 
   FREE_ARRAY(vm, Frame, vm->frames, vm->capacity);
+}
+
+void reset(VM* vm) {
+  vm->count = 0;
+  vm->capacity = FRAME_DEFAULT_SIZE;
+  vm->frames = ALLOCATE_ARRAY(vm, Frame, vm->frames, 0 , vm->capacity);
+  
+  vm->upvalues = NULL;
+
+  vm->stack.top = vm->stack.content;
 }
 
 void native(VM* vm, const char* identifier, Internal internal) {
@@ -129,7 +128,7 @@ static bool invoke(VM* vm, Closure* closure, int count) {
 
     vm->capacity = GROW_CAPACITY(capacity);
 
-    vm->frames = GROW_ARRAY(vm, Frame, vm->frames, capacity, vm->capacity);
+    vm->frames = ALLOCATE_ARRAY(vm, Frame, vm->frames, capacity, vm->capacity);
   }
 
   Frame* frame = &vm->frames[vm->count++];
@@ -158,7 +157,7 @@ static bool call(VM* vm, Value value, int count) {
 
         set_handler(&handler, vm);
 
-        Internal internal = AS_NATIVE(value);
+        Internal internal = AS_NATIVE(value)->internal;
 
         Value result = internal(count, vm->stack.top - count, &handler);
 
@@ -229,8 +228,7 @@ static Results run(VM* vm) {
         error(vm, run_time_errors[MUST_BE_NUMBERS]); \
         return INTERPRET_RUNTIME_ERROR; \
       } \
-      Value right = pop(&vm->stack, 1); \
-      Value left = pop(&vm->stack, 1); \
+      Value right = pop(&vm->stack, 1); Value left = pop(&vm->stack, 1); \
       mpf_t result; mpf_init(result); \
       operator(result, AS_NUMBER(left)->content, AS_NUMBER(right)->content); \
       push(&vm->stack, NUMBER(vm, result)); \
@@ -240,15 +238,13 @@ static Results run(VM* vm) {
   #define BINARY_COMPARISON(operator) \
     do { \
       if (IS_NUMBER(peek(&vm->stack, 0)) && IS_NUMBER(peek(&vm->stack, 1))) { \
-        Value right = pop(&vm->stack, 1); \
-        Value left = pop(&vm->stack, 1); \
+        Value right = pop(&vm->stack, 1); Value left = pop(&vm->stack, 1); \
         bool comparison = mpf_cmp(AS_NUMBER(left)->content, AS_NUMBER(right)->content) operator 0; \
         push(&vm->stack, BOOLEAN(comparison)); \
         COMPUTE_NEXT(); \
       } \
       if (IS_STRING(peek(&vm->stack, 0)) && IS_STRING(peek(&vm->stack, 1))) { \
-        String* right = AS_STRING(pop(&vm->stack, 1)); \
-        String* left = AS_STRING(pop(&vm->stack, 1)); \
+        String* right = AS_STRING(pop(&vm->stack, 1)); String* left = AS_STRING(pop(&vm->stack, 1)); \
         bool comparison = left->length operator right->length; \
         if (left->length == right->length) comparison = memcmp(left->content, right->content, left->length) operator 0; \
         push(&vm->stack, BOOLEAN(comparison)); \
@@ -298,12 +294,6 @@ static Results run(VM* vm) {
     COMPUTE_NEXT();
   
   OP_ADD: 
-    if (IS_NUMBER(peek(&vm->stack, 0)) && IS_NUMBER(peek(&vm->stack, 1))) {
-      BINARY_OPERATION(mpf_add);
-
-      COMPUTE_NEXT();
-    }
-
     if (IS_STRING(peek(&vm->stack, 0)) && IS_STRING(peek(&vm->stack, 1))) {
       String* right = AS_STRING(peek(&vm->stack, 0));
       String* left = AS_STRING(peek(&vm->stack, 0));
@@ -322,6 +312,12 @@ static Results run(VM* vm) {
       pop(&vm->stack, 2);
 
       push(&vm->stack, OBJECT(result));
+
+      COMPUTE_NEXT();
+    }
+
+    if (IS_NUMBER(peek(&vm->stack, 0)) && IS_NUMBER(peek(&vm->stack, 1))) {
+      BINARY_OPERATION(mpf_add);
 
       COMPUTE_NEXT();
     }
@@ -507,14 +503,6 @@ static Results run(VM* vm) {
 
     vm->count--;
 
-    if (vm->capacity > FRAME_DEFAULT_SIZE && vm->count < vm->capacity / 2) {
-      int capacity = vm->capacity;
-
-      vm->capacity = vm->capacity / 2;
-
-      vm->frames = GROW_ARRAY(vm, Frame, vm->frames, capacity, vm->capacity);
-    }
-
     if (vm->count == 0) {
       pop(&vm->stack, 1);
       return INTERPRET_OK;
@@ -597,15 +585,16 @@ static Results run(VM* vm) {
 
     Value value;
 
-    if (table_get(&instance->fields, property, &value)) {
-      pop(&vm->stack, 1);
-      push(&vm->stack, value);
-      COMPUTE_NEXT();
+    if (table_get(&instance->fields, property, &value) == false) {
+      error(vm, run_time_errors[UNDEFINED_PROPERTY], property->content);
+
+      return INTERPRET_RUNTIME_ERROR;;
     }
 
-    error(vm, run_time_errors[UNDEFINED_PROPERTY], property->content);
+    pop(&vm->stack, 1);
+    push(&vm->stack, value);
 
-    return INTERPRET_RUNTIME_ERROR;
+    COMPUTE_NEXT();
   }
 
   OP_EMPTY: COMPUTE_NEXT();
