@@ -11,8 +11,6 @@
 
 #define GARBAGE_COLLECTOR_GROW_FACTOR 2
 
-#define DEFAULT_THRESHOLD 1024 * 64
-
 #define GROW_CAPACITY(capacity) \
   ( (capacity) < MINIMUM_CAPACITY ? MINIMUM_CAPACITY : (capacity) * LOAD_FACTOR )
 

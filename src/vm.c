@@ -7,6 +7,10 @@
 #include "types/object.h"
 #include "utilities/memory.h"
 
+#define FRAME_DEFAULT_SIZE 16
+
+#define DEFAULT_THRESHOLD 1024 * 64
+
 void initialize_VM(VM* vm) {
   vm->frames = NULL;
   vm->objects = NULL;
@@ -146,12 +150,6 @@ static bool call(VM* vm, Value value, int count) {
       case OBJECT_CLOSURE:
         return invoke(vm, AS_CLOSURE(value), count);
 
-      case OBJECT_CLASS: {
-        Class* class = AS_CLASS(value);
-        vm->stack.top[- count - 1] = OBJECT(new_instance(vm, class));
-        return true;
-      }
-
       case OBJECT_NATIVE: {
         Handler handler;
 
@@ -169,6 +167,18 @@ static bool call(VM* vm, Value value, int count) {
           error(vm, handler.message);
         
         return !handler.error;
+      }
+
+      case OBJECT_CLASS: {
+        Class* class = AS_CLASS(value);
+        vm->stack.top[- count - 1] = OBJECT(new_instance(vm, class));
+        return true;
+      } 
+
+      case OBJECT_BOUND: {
+        Bound* bound = AS_BOUND(value);
+        vm->stack.top[- count - 1] = bound->receiver;
+        return invoke(vm, bound->method, count);
       }
     }
   }
@@ -211,6 +221,27 @@ static void close(VM* vm, Value* last) {
   }
 }
 
+static bool execute(VM* vm, Table table, String* property) {
+  Value method;
+
+  if (table_get(&table, property, &method) == false) {
+    error(vm, run_time_errors[UNDEFINED_PROPERTY], property->content);
+    return false;
+  }
+
+  Value receiver = peek(&vm->stack, 0);
+
+  Closure* closure = AS_CLOSURE(method);
+
+  pop(&vm->stack, 1);
+
+  if (OBJECT_TYPE(receiver) == OBJECT_INSTANCE)
+    push(&vm->stack, OBJECT(new_bound(vm, receiver, closure)));
+  else push(&vm->stack, OBJECT(closure));
+
+  return true;
+}
+
 static Results run(VM* vm) {
   Frame* frame = &vm->frames[vm->count - 1];
 
@@ -231,7 +262,7 @@ static Results run(VM* vm) {
       Value right = pop(&vm->stack, 1); Value left = pop(&vm->stack, 1); \
       mpf_t result; mpf_init(result); \
       operator(result, AS_NUMBER(left)->content, AS_NUMBER(right)->content); \
-      push(&vm->stack, NUMBER(vm, result)); \
+      push(&vm->stack, OBJECT(allocate_number_from_gmp(vm, result)) ); \
       mpf_clear(result); \
     } while(false) 
 
@@ -281,22 +312,22 @@ static Results run(VM* vm) {
       return INTERPRET_RUNTIME_ERROR;
     }
 
-    mpf_t number; 
+    mpf_t result; 
     
-    mpf_init(number);
+    mpf_init(result);
 
-    mpf_neg(number, AS_NUMBER(pop(&vm->stack, 1))->content);
+    mpf_neg(result, AS_NUMBER(pop(&vm->stack, 1))->content);
 
-    push(&vm->stack, NUMBER(vm, number));
+    push(&vm->stack, OBJECT(allocate_number_from_gmp(vm, result)) );
 
-    mpf_clear(number);
+    mpf_clear(result);
 
     COMPUTE_NEXT();
   
   OP_ADD: 
     if (IS_STRING(peek(&vm->stack, 0)) && IS_STRING(peek(&vm->stack, 1))) {
       String* right = AS_STRING(peek(&vm->stack, 0));
-      String* left = AS_STRING(peek(&vm->stack, 0));
+      String* left = AS_STRING(peek(&vm->stack, 1));
 
       int length = left->length + right->length;
 
@@ -332,7 +363,7 @@ static Results run(VM* vm) {
 
   OP_DIVIDE: BINARY_OPERATION(mpf_div); COMPUTE_NEXT();
 
-  OP_POWER: 
+  OP_POWER: {
     if (!IS_NUMBER(peek(&vm->stack, 0)) || !IS_NUMBER(peek(&vm->stack, 1))) { 
       error(vm, run_time_errors[MUST_BE_NUMBER]); 
       return INTERPRET_RUNTIME_ERROR; 
@@ -349,11 +380,12 @@ static Results run(VM* vm) {
 
     mpf_pow_ui(result, AS_NUMBER(left)->content, exponent);
 
-    push(&vm->stack, NUMBER(vm, result)); 
+    push(&vm->stack, OBJECT(allocate_number_from_gmp(vm, result)) ); 
 
     mpf_clear(result);
 
     COMPUTE_NEXT();
+  }
 
   OP_NOT: {
     bool result = falsey(pop(&vm->stack, 1));
@@ -573,26 +605,61 @@ static Results run(VM* vm) {
   }
 
   OP_PROPERTY_GET: {
-    if (IS_INSTANCE(peek(&vm->stack, 0)) == false) {
-      error(vm, run_time_errors[CANNOT_HAVE_PROPERTIES]);
-
-      return INTERPRET_RUNTIME_ERROR;
-    }
-
-    Instance* instance = AS_INSTANCE(peek(&vm->stack, 0));
+    Value caller = peek(&vm->stack, 0);
 
     String* property = AS_STRING(READ_CONSTANT());
 
-    Value value;
+    if (IS_INSTANCE(caller) == true) {
+      Instance* instance = AS_INSTANCE(caller);
 
-    if (table_get(&instance->fields, property, &value) == false) {
-      error(vm, run_time_errors[UNDEFINED_PROPERTY], property->content);
+      Value value;
 
-      return INTERPRET_RUNTIME_ERROR;;
+      if (table_get(&instance->fields, property, &value) == true) {
+        pop(&vm->stack, 1);
+        push(&vm->stack, value);
+        COMPUTE_NEXT();
+      }
+
+      if (execute(vm, instance->class->methods, property) == false)
+        return INTERPRET_RUNTIME_ERROR;
+
+      COMPUTE_NEXT();
     }
 
+    if (IS_CLASS(caller) == true) {
+      Class* class = AS_CLASS(caller);
+
+      if (execute(vm, class->functions, property) == false)
+        return INTERPRET_RUNTIME_ERROR;
+
+      COMPUTE_NEXT();
+    }
+
+    error(vm, run_time_errors[CANNOT_HAVE_PROPERTIES]);
+
+    return INTERPRET_RUNTIME_ERROR;
+  }
+
+  OP_FUNCTION: {
+    Value property = peek(&vm->stack, 0);
+
+    Class* class = AS_CLASS(peek(&vm->stack, 1));
+
+    table_set(&class->functions, AS_STRING(READ_CONSTANT()), property);
+
     pop(&vm->stack, 1);
-    push(&vm->stack, value);
+
+    COMPUTE_NEXT();
+  }
+
+  OP_METHOD: {
+    Value property = peek(&vm->stack, 0);
+
+    Class* class = AS_CLASS(peek(&vm->stack, 1));
+
+    table_set(&class->methods, AS_STRING(READ_CONSTANT()), property);
+
+    pop(&vm->stack, 1);
 
     COMPUTE_NEXT();
   }

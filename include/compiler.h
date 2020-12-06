@@ -8,7 +8,7 @@
 
 #define INITIALIZE -1
 
-#define MAXIMUM_BOUND ( UINT8_MAX + 1 )
+#define MAXIMUM_LIMIT ( UINT8_MAX + 1 )
 
 typedef enum {
   PRECEDENCE_NONE,
@@ -26,6 +26,8 @@ typedef enum {
 
 typedef enum {
   POSITION_FUNCTION,
+  POSITION_METHOD,
+  POSITION_CONSTRUCTOR,
   POSITION_SCRIPT
 } Positions;
 
@@ -47,12 +49,18 @@ typedef struct Compiler {
 
   Positions position;
 
-  Up ups[MAXIMUM_BOUND];
+  Up ups[MAXIMUM_LIMIT];
 
-  Local locals[MAXIMUM_BOUND];
+  Local locals[MAXIMUM_LIMIT];
   int count;
   int scope;
 } Compiler;
+
+typedef struct Current {
+  struct Current* enclosing;
+  Token name;
+  bool inheritance;
+} Entity;
 
 typedef struct {
   Tokenizer tokenizer;
@@ -62,6 +70,8 @@ typedef struct {
   bool panic, error;
 
   Compiler* compiler;
+
+  Entity* entity;
 
   VM* vm;
 } Parser;

@@ -80,7 +80,7 @@ Value input_native(int count, Value* arguments, Handler* handler) {
 
     ssize_t length = getline(&content, &size, stdin);
 
-    return STRING(handler->vm, content, length - 1);
+    return OBJECT(copy_string(handler->vm, content, length - 1));
   } 
   
   return error(handler, run_time_errors[EXPECT_ARGUMENTS_NUMBER], 2, 1, count);

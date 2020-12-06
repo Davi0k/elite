@@ -159,9 +159,16 @@ static Types trie(Tokenizer* tokenizer) {
     case 'i': return keyword(tokenizer, 1, 1, "f", TOKEN_IF);
     case 'n': return keyword(tokenizer, 1, 2, "ot", TOKEN_NOT);
     case 'o': return keyword(tokenizer, 1, 1, "r", TOKEN_OR);
-    case 'p': return keyword(tokenizer, 1, 5, "arent", TOKEN_PARENT);
     case 'r': return keyword(tokenizer, 1, 5, "eturn", TOKEN_RETURN);
-    case 's': return keyword(tokenizer, 1, 2, "et", TOKEN_SET);
+
+    case 's': 
+      if (tokenizer->current - tokenizer->start > 1) {
+        switch (tokenizer->start[1]) {
+          case 'e': return keyword(tokenizer, 2, 1, "t", TOKEN_SET);
+          case 't': return keyword(tokenizer, 2, 4, "atic", TOKEN_STATIC);
+          case 'u': return keyword(tokenizer, 2, 3, "per", TOKEN_SUPER);
+        }
+      }
 
     case 't':
       if (tokenizer->current - tokenizer->start > 1) {

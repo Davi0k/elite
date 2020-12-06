@@ -19,15 +19,7 @@ static Object* allocate_object(VM* vm, size_t size, Objects type) {
   return object;
 }
 
-Upvalue* new_upvalue(VM* vm, Value* location) {
-  Upvalue* upvalue = ALLOCATE_OBJECT(vm, Upvalue, OBJECT_UPVALUE);
-  upvalue->location = location;
-  upvalue->closed = UNDEFINED;
-  upvalue->next = NULL;
-  return upvalue;
-}
-
-Number* allocate_number(VM* vm, mpf_t value) {
+Number* allocate_number_from_gmp(VM* vm, mpf_t value) {
   Number* number = ALLOCATE_OBJECT(vm, Number, OBJECT_NUMBER);
   mpf_init_set(number->content, value);
   return number;
@@ -86,6 +78,16 @@ String* take_string(VM* vm, const char* content, int length) {
   return allocate_string(vm, content, length, hash);
 }
 
+Upvalue* new_upvalue(VM* vm, Value* location) {
+  Upvalue* upvalue = ALLOCATE_OBJECT(vm, Upvalue, OBJECT_UPVALUE);
+
+  upvalue->location = location;
+  upvalue->closed = UNDEFINED;
+  upvalue->next = NULL;
+
+  return upvalue;
+}
+
 Function* new_function(VM* vm) {
   Function* function = ALLOCATE_OBJECT(vm, Function, OBJECT_FUNCTION);
 
@@ -114,9 +116,20 @@ Closure* new_closure(VM* vm, Function* function) {
   return closure;
 }
 
+Native* new_native(VM* vm, Internal internal) {
+  Native* native = ALLOCATE_OBJECT(vm, Native, OBJECT_NATIVE);
+  native->internal = internal;
+  return native;
+}
+
 Class* new_class(VM* vm, String* identifier) {
   Class* class = ALLOCATE_OBJECT(vm, Class, OBJECT_CLASS);
+
   class->identifier = identifier;
+
+  initialize_table(&class->functions, vm);
+  initialize_table(&class->methods, vm);
+
   return class;
 }
 
@@ -130,36 +143,42 @@ Instance* new_instance(VM* vm, Class* class) {
   return instance;
 }
 
-Native* new_native(VM* vm, Internal internal) {
-  Native* native = ALLOCATE_OBJECT(vm, Native, OBJECT_NATIVE);
-  native->internal = internal;
-  return native;
+Bound* new_bound(VM* vm, Value receiver, Closure* method) {
+  Bound* bound = ALLOCATE_OBJECT(vm, Bound, OBJECT_BOUND);
+
+  bound->receiver = receiver;
+  bound->method = method;
+
+  return bound;
 }
 
 void print_object(Value value) {
   switch (OBJECT_TYPE(value)) {
-    case OBJECT_UPVALUE: printf("upvalue"); break;
-
     case OBJECT_NUMBER: gmp_printf("%.Ff", AS_NUMBER(value)->content); break;
 
     case OBJECT_STRING: printf("%s", AS_STRING(value)->content); break;
 
-    case OBJECT_FUNCTION: {
-      Function* function = AS_FUNCTION(value);
+    case OBJECT_FUNCTION:
+    case OBJECT_CLOSURE: {
+      Function* function;     
+
+      if (OBJECT_TYPE(value) == OBJECT_FUNCTION)
+        function = AS_FUNCTION(value);
+      else function = AS_CLOSURE(value)->function;
 
       if (function->identifier == NULL)
-        printf("<Script>");
+        printf("<Anonymous Function>");
       else printf("<Function %s>", function->identifier->content);
 
       break;
     }
 
-    case OBJECT_CLOSURE: printf("<Closure Function %s>", AS_CLOSURE(value)->function->identifier->content); break;
+    case OBJECT_NATIVE: printf("<Native Function>"); break;
 
     case OBJECT_CLASS: printf("<Class %s>", AS_CLASS(value)->identifier->content); break;
 
-    case OBJECT_INSTANCE: printf("<Instance of %s>", AS_INSTANCE(value)->class->identifier->content); break;
+    case OBJECT_INSTANCE: printf("<Instance of %s>", AS_INSTANCE(value)->class->identifier->content); break; 
 
-    case OBJECT_NATIVE: printf("<Native>"); break;
+    case OBJECT_BOUND: printf("<Method %s>", AS_BOUND(value)->method->function->identifier->content); break;
   }
 }

@@ -12,8 +12,6 @@
 #include "types/stack.h"
 #include "types/value.h"
 
-#define FRAME_DEFAULT_SIZE 16
-
 typedef enum {
   INTERPRET_OK,
   INTERPRET_COMPILE_ERROR,

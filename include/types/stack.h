@@ -5,7 +5,7 @@
 
 #include "types/value.h"
 
-typedef struct {
+typedef struct Stack {
   Value content[1024 * 64];
   
   Value* top;

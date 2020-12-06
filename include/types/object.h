@@ -8,39 +8,38 @@
 #include "utilities/chunk.h"
 #include "types/value.h"
 
-#define GMP_NEUTRAL(vm) ( OBJECT(allocate_number_from_double(vm, 1.0)) )
-
-#define OBJECT_TYPE(value) ( AS_OBJECT(value)->type )
-
-#define NUMBER(vm, value) ( OBJECT(allocate_number(vm, value))  )
-
-#define STRING(vm, content, length) ( OBJECT(copy_string(vm, content, length)) )
-
 #define IS_NUMBER(value) validate(value, OBJECT_NUMBER)
 #define IS_STRING(value) validate(value, OBJECT_STRING)
+#define IS_UPVALUE(value) validate(value, OBJECT_UPVALUE)
 #define IS_FUNCTION(value) validate(value, OBJECT_FUNCTION)
 #define IS_CLOSURE(value) validate(value, OBJECT_CLOSURE)
+#define IS_NATIVE(value) validate(value, OBJECT_NATIVE)
 #define IS_CLASS(value) validate(value, OBJECT_CLASS)
 #define IS_INSTANCE(value) validate(value, OBJECT_INSTANCE)
-#define IS_NATIVE(value) validate(value, OBJECT_NATIVE)
+#define IS_BOUND(value) validate(value, OBJECT_BOUND)
 
 #define AS_NUMBER(value) ( (Number*)AS_OBJECT(value) )
 #define AS_STRING(value) ( (String*)AS_OBJECT(value) )
+#define AS_UPVALUE(value) ( (Upvalue*)AS_OBJECT(value) )
 #define AS_FUNCTION(value) ( (Function*)AS_OBJECT(value) )
 #define AS_CLOSURE(value) ( (Closure*)AS_OBJECT(value) )
+#define AS_NATIVE(value) ( (Native*)AS_OBJECT(value) )
 #define AS_CLASS(value) ( (Class*)AS_OBJECT(value) )
 #define AS_INSTANCE(value) ( (Instance*)AS_OBJECT(value) )
-#define AS_NATIVE(value) ( (Native*)AS_OBJECT(value) )
+#define AS_BOUND(value) ( (Bound*)AS_OBJECT(value) )
+
+#define OBJECT_TYPE(value) ( AS_OBJECT(value)->type )
 
 typedef enum {
-  OBJECT_UPVALUE,
   OBJECT_NUMBER,
   OBJECT_STRING,
+  OBJECT_UPVALUE,
   OBJECT_FUNCTION,
   OBJECT_CLOSURE,
+  OBJECT_NATIVE,
   OBJECT_CLASS,
   OBJECT_INSTANCE,
-  OBJECT_NATIVE
+  OBJECT_BOUND,
 } Objects;
 
 typedef struct Object {
@@ -48,13 +47,6 @@ typedef struct Object {
   struct Object* next;
   bool mark;
 } Object;
-
-typedef struct Upvalue {
-  Object object;
-  Value* location;
-  Value closed;
-  struct Upvalue* next;
-} Upvalue;
 
 typedef struct Number {
   Object object;
@@ -67,6 +59,13 @@ typedef struct String {
   char* content;
   uint32_t hash;
 } String;
+
+typedef struct Upvalue {
+  Object object;
+  Value* location;
+  Value closed;
+  struct Upvalue* next;
+} Upvalue;
 
 typedef struct Function {
   Object object;
@@ -83,26 +82,30 @@ typedef struct Closure {
   int count;
 } Closure;
 
+typedef struct Native {
+  Object object;
+  Internal internal;
+} Native;
 typedef struct Class {
   Object object;
   String* identifier;
+  Table functions;
+  Table methods;
 } Class;
 
-typedef struct Instance{
+typedef struct Instance {
   Object object;
   Class* class;
   Table fields;
 } Instance;
 
-typedef struct Native {
+typedef struct Bound {
   Object object;
-  Internal internal;
-} Native;
+  Value receiver;
+  Closure* method;
+} Bound;
 
-Upvalue* new_upvalue(VM* vm, Value* location);
-
-Number* allocate_number(VM* vm, mpf_t value);
-
+Number* allocate_number_from_gmp(VM* vm, mpf_t value);
 Number* allocate_number_from_double(VM* vm, double value);
 Number* allocate_number_from_string(VM* vm, const char* value);
 
@@ -111,15 +114,19 @@ String* allocate_string(VM* vm, const char* content, int length, uint32_t hash);
 String* copy_string(VM* vm, const char* content, int length);
 String* take_string(VM* vm, const char* content, int length);
 
+Upvalue* new_upvalue(VM* vm, Value* location);
+
 Function* new_function(VM* vm);
 
 Closure* new_closure(VM* vm, Function* function);
+
+Native* new_native(VM* vm, Internal internal);
 
 Class* new_class(VM* vm, String* identifier);
 
 Instance* new_instance(VM* vm, Class* class);
 
-Native* new_native(VM* vm, Internal internal);
+Bound* new_bound(VM* vm, Value receiver, Closure* method);
 
 void print_object(Value value);
 

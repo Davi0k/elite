@@ -74,6 +74,8 @@ int disassemble_instruction(Chunk* chunk, int offset) {
     case OP_CLASS:
     case OP_PROPERTY_SET:
     case OP_PROPERTY_GET:
+    case OP_FUNCTION:
+    case OP_METHOD:
       return constant_representation(strings[instruction], chunk, offset);
 
     case OP_TRUE:

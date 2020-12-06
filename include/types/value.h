@@ -11,6 +11,7 @@ typedef struct Function Function;
 typedef struct Closure Closure;
 typedef struct Class Class;
 typedef struct Instance Instance;
+typedef struct Bound Bound;
 typedef struct Native Native;
 
 #define BOOLEAN(value) ( (Value){ VALUE_BOOLEAN, { .boolean = value } } )

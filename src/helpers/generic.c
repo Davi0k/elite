@@ -34,7 +34,9 @@ const char* compile_time_errors[] = {
   [EXPECT_CLASS_IDENTIFIER] = "Expect Class identifier.",
   [EXPECT_OPEN_CLASS] = "Expect '{' before Class body.",
   [EXPECT_CLOSE_CLASS] = "Expect '}' after Class body.",
-  [EXPECT_PROPERTY_NAME] = "Expect property identifier."
+  [EXPECT_PROPERTY_IDENTIFIER] = "Expect property identifier.",
+  [EXPECT_METHOD_IDENTIFIER] = "Expect method identifier.",
+  [CANNOT_USE_THIS] = "Cannot use 'this' outiside of a class method."
 };
 
 const char* run_time_errors[] = {

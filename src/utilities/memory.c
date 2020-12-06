@@ -94,8 +94,23 @@ void traverse(VM* vm, Parents* parents) {
 
       case OBJECT_CLASS: {
         Class* class = (Class*)object;
+
         mark(parents, OBJECT(class->identifier));
+
+        for (int i = 0; i < class->functions.capacity; i++) {
+          Entry* entry = &class->functions.entries[i];
+          mark(parents, OBJECT(entry->key));
+          mark(parents, entry->value);
+        }
+
+        for (int i = 0; i < class->methods.capacity; i++) {
+          Entry* entry = &class->methods.entries[i];
+          mark(parents, OBJECT(entry->key));
+          mark(parents, entry->value);
+        }
+
         break;
+
       }
 
       case OBJECT_INSTANCE: {
@@ -108,6 +123,18 @@ void traverse(VM* vm, Parents* parents) {
           mark(parents, OBJECT(entry->key));
           mark(parents, entry->value);
         }
+
+        break;
+      }
+
+      case OBJECT_BOUND: {
+        Bound* bound = (Bound*)object;
+
+        mark(parents, bound->receiver);
+
+        mark(parents, OBJECT(bound->method));
+
+        break;
       }
     }
   }
@@ -164,11 +191,6 @@ void sweep(VM* vm) {
 
 void free_object(VM* vm, Object* object) {
   switch (object->type) {
-    case OBJECT_UPVALUE: {
-      FREE(vm, Upvalue, object);
-      break;
-    }
-
     case OBJECT_NUMBER: {
       Number* number = (Number*)object;
       mpf_clear(number->content);
@@ -180,6 +202,11 @@ void free_object(VM* vm, Object* object) {
       String* string = (String*)object;
       FREE_ARRAY(vm, char, string->content, string->length + 1);
       FREE(vm, String, object);
+      break;
+    }
+
+    case OBJECT_UPVALUE: {
+      FREE(vm, Upvalue, object);
       break;
     }
 
@@ -197,7 +224,15 @@ void free_object(VM* vm, Object* object) {
       break;
     }
 
+    case OBJECT_NATIVE: {
+      FREE(vm, Native, object);
+      break;
+    }
+
     case OBJECT_CLASS: {
+      Class* class = (Class*)object;
+      free_table(&class->functions);
+      free_table(&class->methods);
       FREE(vm, Class, object);
       break;
     }
@@ -209,8 +244,8 @@ void free_object(VM* vm, Object* object) {
       break;
     } 
 
-    case OBJECT_NATIVE: {
-      FREE(vm, Native, object);
+    case OBJECT_BOUND: {
+      FREE(vm, Bound, object);
       break;
     }
   }
