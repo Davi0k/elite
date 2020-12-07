@@ -74,7 +74,7 @@ int disassemble_instruction(Chunk* chunk, int offset) {
     case OP_CLASS:
     case OP_PROPERTY_SET:
     case OP_PROPERTY_GET:
-    case OP_FUNCTION:
+    case OP_MEMBER:
     case OP_METHOD:
       return constant_representation(strings[instruction], chunk, offset);
 
@@ -98,6 +98,17 @@ int disassemble_instruction(Chunk* chunk, int offset) {
     case OP_RETURN:
     case OP_EXIT:
       return simple_representation(strings[instruction], offset);
+
+    case OP_INVOKE: {
+      uint8_t constant = chunk->code[offset + 1];
+      uint8_t count = chunk->code[offset + 2];
+      
+      printf("%-16s (%d args) %4d '", strings[instruction], count, constant);
+      print_value(chunk->constants.values[constant]);
+      printf("'\n");
+
+      return offset + 3;
+    }
 
     case OP_CLOSURE: {
       offset++;

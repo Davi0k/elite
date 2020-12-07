@@ -43,8 +43,6 @@ typedef struct VM {
 void initialize_VM(VM* vm);
 void free_VM(VM* vm);
 
-void reset(VM* vm);
-
 void native(VM* vm, const char* identifier, Internal internal);
 
 Results interpret(VM* vm, const char* source);

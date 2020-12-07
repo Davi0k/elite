@@ -3,14 +3,14 @@
 Elite is a Multi-Paradigm and Stack-Based interpreter written in C. It has a simple and easy grammar and works with a Compiler written following the `Pratt's Parser` technique and a Virtual Machine built using  `Direct Threading` dispatching. 
 
 ### Language Keywords
-The interpreter currently supports a total of **21** keywords. Those are:
+The interpreter currently supports a total of **22** keywords. Those are:
 ```
 and | class | define | do | 
 else | empty | exit | false | 
 for | global | if | not | 
-or | parent | return | set | 
-true | this | undefined | void | 
-while
+or | return | set | static |
+super | true | this | undefined | 
+void | while
 ```
 
 ## Building the interpreter
@@ -69,9 +69,33 @@ To run a script, use the following dedicated Command-Line Interface (**CLI**) sy
 ```
 .\elite.exe [path] [-v]
 ```
-If you want, you can use the `REPL` (Read Eval Print Loop) by running the **CLI** without any positional parameters. 
 
-## Example script
+## Example scripts
+A simple Arithmetic Calculator made using some Control-Flow statements.
+
+```
+set result: 0; #Define a global variable
+
+#Use an infinite loop to allow more than one operation
+while true: {
+    print("Input two Numbers:");
+
+    #Get inputs and convert them using the specifics Native Functions
+    set x: number(input()), y: number(input()); 
+
+    print("Insert an operator (+, -, *, /):");
+    
+    set operator: input();
+
+    if operator == '+': result = x + y;
+    if operator == '-': result = x - y;
+    if operator == '*': result = x * y;
+    if operator == '/': result = x / y;
+
+    print("The result is: ", result); #Print the result
+}
+```
+
 A simple Script to calculate the `factorial` and the corresponding number of the `fibonacci` series using recursive algorithms and measuring the execution time.
 
 ```
@@ -102,6 +126,30 @@ print("The factorial is ", factorial(number));
 stop = stopwatch();
 
 print("Execution Time (s): ", stop - start);
+```
+
+A small Script using the OOP Paradigm to calculate the validity of a triangle.
+
+```
+#Define a new class
+class Triangle {
+    set A: 0, B: 0, C: 0; #Add some class members
+
+    #Define a constructor to initialize instances of this class
+    define Triangle(A, B, C) {
+        this.A = A;
+        this.B = B;
+        this.C = C;
+    }
+
+    define check: this.A + this.B + this.C == 180;
+}
+
+set triangle: Triangle(30, 60, 90); #Create an instance of the class
+
+if triangle.check():
+    print("The Triangle is valid.");
+else: print("The Triangle is not valid.");
 ```
 
 ## License

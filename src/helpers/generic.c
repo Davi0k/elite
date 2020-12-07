@@ -35,9 +35,12 @@ const char* compile_time_errors[] = {
   [EXPECT_OPEN_CLASS] = "Expect '{' before Class body.",
   [EXPECT_CLOSE_CLASS] = "Expect '}' after Class body.",
   [EXPECT_PROPERTY_IDENTIFIER] = "Expect property identifier.",
+  [EXPECT_MEMBER_IDENTIFIER] = "Expect member identifier.",
   [EXPECT_METHOD_IDENTIFIER] = "Expect method identifier.",
   [CANNOT_USE_THIS] = "Cannot use 'this' outiside of a class method.",
-  [CANNOT_RETURN_CONSTRUCTOR] = "Cannot return a value from a constructor."
+  [CANNOT_RETURN_CONSTRUCTOR] = "Cannot return a value from a constructor.",
+  [EXPECT_COLON_TERNARY] = "Expect ':' in ternary operator.",
+  [EXPECT_SET_DEFINE] = "Expect 'set' or 'define' statement in Class definition."
 };
 
 const char* run_time_errors[] = {
@@ -54,7 +57,8 @@ const char* run_time_errors[] = {
   [UNDEFINED_ERROR] = "Undefined Error Message.",
   [MUST_INCLUDE_STRING] = "Expect String after 'include' statement.",
   [CANNOT_HAVE_PROPERTIES] = "Only instances can have fields.",
-  [UNDEFINED_PROPERTY] = "Undefined property '%s'."
+  [UNDEFINED_PROPERTY] = "Undefined property '%s'.",
+  [ONLY_INSTANCES_HAVE_METHODS] = "Only Instances have methods."
 };
 
 const char* read_file_errors[] = {

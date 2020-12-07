@@ -248,6 +248,7 @@ Token scan(Tokenizer* tokenizer) {
 
     case ';': return make(tokenizer, TOKEN_SEMICOLON);
     case ',': return make(tokenizer, TOKEN_COMMA);
+    case '?': return make(tokenizer, TOKEN_QUESTION);
     case ':': return make(tokenizer, TOKEN_COLON);
     case '.': return make(tokenizer, TOKEN_DOT);
 

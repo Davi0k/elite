@@ -86,10 +86,11 @@ typedef struct Native {
   Object object;
   Internal internal;
 } Native;
+
 typedef struct Class {
   Object object;
   String* identifier;
-  Table functions;
+  Table members;
   Table methods;
 } Class;
 

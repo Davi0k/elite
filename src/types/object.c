@@ -127,7 +127,7 @@ Class* new_class(VM* vm, String* identifier) {
 
   class->identifier = identifier;
 
-  initialize_table(&class->functions, vm);
+  initialize_table(&class->members, vm);
   initialize_table(&class->methods, vm);
 
   return class;
@@ -139,6 +139,8 @@ Instance* new_instance(VM* vm, Class* class) {
   instance->class = class;
 
   initialize_table(&instance->fields, vm);
+
+  table_copy(&class->members, &instance->fields);
 
   return instance;
 }

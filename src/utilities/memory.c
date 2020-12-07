@@ -97,8 +97,8 @@ void traverse(VM* vm, Parents* parents) {
 
         mark(parents, OBJECT(class->identifier));
 
-        for (int i = 0; i < class->functions.capacity; i++) {
-          Entry* entry = &class->functions.entries[i];
+        for (int i = 0; i < class->members.capacity; i++) {
+          Entry* entry = &class->members.entries[i];
           mark(parents, OBJECT(entry->key));
           mark(parents, entry->value);
         }
@@ -231,7 +231,7 @@ void free_object(VM* vm, Object* object) {
 
     case OBJECT_CLASS: {
       Class* class = (Class*)object;
-      free_table(&class->functions);
+      free_table(&class->members);
       free_table(&class->methods);
       FREE(vm, Class, object);
       break;

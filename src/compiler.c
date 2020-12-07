@@ -17,6 +17,20 @@
     write_chunk(chunk, byte, line); \
   } while(false)
 
+static void stream(Parser* parser, int count, ...) {
+  va_list list;
+
+  va_start(list, count);
+
+  for (int i = 0; i < count; i++) {
+    uint8_t byte = (uint8_t)va_arg(list, int);
+
+    EMIT_BYTE(parser, byte);
+  }
+
+  va_end(list);
+}
+
 static void set_compiler(Parser* parser, Compiler* compiler, Positions position) {
   compiler->enclosing = parser->compiler;
 
@@ -42,24 +56,6 @@ static void set_compiler(Parser* parser, Compiler* compiler, Positions position)
   local->identifier.length = position == POSITION_FUNCTION ? 0 : 4;
 }
 
-static void stream(Parser* parser, int count, ...) {
-  va_list list;
-
-  va_start(list, count);
-
-  for (int i = 0; i < count; i++) {
-    uint8_t byte = (uint8_t)va_arg(list, int);
-
-    EMIT_BYTE(parser, byte);
-  }
-
-  va_end(list);
-}
-
-static void espression(Parser* parser);
-
-static void parse(Parser* parser, Precedences precedence);
-
 static void grouping(Parser* parser, bool assign);
 static void unary(Parser* parser, bool assign);
 static void binary(Parser* parser, bool assign);
@@ -71,6 +67,8 @@ static void literal(Parser* parser, bool assign);
 static void and(Parser* parser, bool assign);
 static void or(Parser* parser, bool assign);
 
+static void ternary(Parser* parser, bool assign);
+
 static void variable(Parser* parser, bool assign);
 static void function(Parser* parser, bool assign);
 
@@ -80,9 +78,12 @@ static void accessor(Parser* parser, bool assign);
 
 static void this(Parser* parser, bool assign);
 
+static void expression(Parser* parser);
 static void block(Parser* parser);
 static void statement(Parser* parser);
 static void instruction(Parser* parser);
+
+static void parse(Parser* parser, Precedences precedence);
 
 Rule rules[] = { 
   [ TOKEN_EOF ] = { NULL, NULL, PRECEDENCE_NONE },
@@ -121,6 +122,7 @@ Rule rules[] = {
   [ TOKEN_LESS_EQUAL ] = { NULL, binary, PRECEDENCE_COMPARISON },
 
   [ TOKEN_COMMA ] = { NULL, NULL, PRECEDENCE_NONE },
+  [ TOKEN_QUESTION ] = { NULL, ternary, PRECEDENCE_PRIMARY },
   [ TOKEN_COLON ] = { NULL, NULL, PRECEDENCE_NONE },
   [ TOKEN_DOT ] = { NULL, accessor,  PRECEDENCE_CALL },
 
@@ -187,10 +189,6 @@ static void error(Parser* parser, Token token, const char* error) {
   parser->error = true;
 }
 
-static bool check(Parser* parser, Types type) {
-  return parser->current.type == type;
-}
-
 static void advance(Parser* parser) {
   parser->previous = parser->current;
 
@@ -202,17 +200,21 @@ static void advance(Parser* parser) {
   }
 }
 
-static void consume(Parser* parser, Types type, const char* message) {
-  if (parser->current.type == type) 
-    return advance(parser);
-
-  error(parser, parser->previous, message);
+static bool check(Parser* parser, Types type) {
+  return parser->current.type == type;
 }
 
 static bool match(Parser* parser, Types type) {
   if (check(parser, type) == false) return false;
   advance(parser);
   return true;
+}
+
+static void consume(Parser* parser, Types type, const char* message) {
+  if (parser->current.type == type) 
+    return advance(parser);
+
+  error(parser, parser->previous, message);
 }
 
 static uint8_t make(Parser* parser, Value value) {
@@ -231,114 +233,6 @@ static void constant(Parser* parser, Value value) {
 
   EMIT_BYTE(parser, OP_CONSTANT);
   EMIT_BYTE(parser, constant);
-}
-
-static void number(Parser* parser, bool assign) {
-  char string[parser->previous.length + 1];
-
-  strncpy(string, parser->previous.start, parser->previous.length + 1);
-
-  string[parser->previous.length] = '\0';
-
-  Number* number = allocate_number_from_string(parser->vm, string);
-
-  Value value = OBJECT(number);
-
-  constant(parser, value);
-}
-
-static void string(Parser* parser, bool assign) {
-  String* string = copy_string(parser->vm, parser->previous.start + 1, parser->previous.length - 2);
-
-  Value value = OBJECT(string);
-
-  constant(parser, value);
-}
-
-static void literal(Parser* parser, bool assign) {
-  switch (parser->previous.type) {
-    case TOKEN_TRUE: EMIT_BYTE(parser, OP_TRUE); break;
-    case TOKEN_FALSE: EMIT_BYTE(parser, OP_FALSE); break;
-
-    case TOKEN_VOID: EMIT_BYTE(parser, OP_VOID); break;
-
-    case TOKEN_UNDEFINED: EMIT_BYTE(parser, OP_UNDEFINED); break;
-
-    default: return;
-  }
-}
-
-static void expression(Parser* parser) {
-  parse(parser, PRECEDENCE_ASSIGNMENT);
-}
-
-static void grouping(Parser* parser, bool assign) {
-  expression(parser);
-
-  consume(parser, TOKEN_CLOSE_PARENTHESES, "Expect a close parentheses after expression.");
-}
-
-static void unary(Parser* parser, bool assign) {
-  Types operator = parser->previous.type;
-
-  parse(parser, PRECEDENCE_UNARY);
-
-  switch (operator) {
-    case TOKEN_MINUS: EMIT_BYTE(parser, OP_NEGATION); break;
-
-    case TOKEN_NOT: EMIT_BYTE(parser, OP_NOT); break;
-
-    default: return;
-  }
-}
-
-static void binary(Parser* parser, bool assign) {
-  Types operator = parser->previous.type;
-
-  Rule* rule = &rules[operator];
-
-  Precedences precedence = (Precedences)(rule->precedence + 1);
-
-  parse(parser, precedence);
-
-  switch (operator) {
-    case TOKEN_PLUS: EMIT_BYTE(parser, OP_ADD); break;
-    case TOKEN_MINUS: EMIT_BYTE(parser, OP_SUBTRACT); break;
-    case TOKEN_ASTERISK: EMIT_BYTE(parser, OP_MULTIPLY); break;
-    case TOKEN_SLASH: EMIT_BYTE(parser, OP_DIVIDE); break;
-
-    case TOKEN_CARET: EMIT_BYTE(parser, OP_POWER); break;
-
-    case TOKEN_EQUAL: EMIT_BYTE(parser, OP_EQUAL); break;
-    case TOKEN_NOT_EQUAL: stream(parser, 2, OP_EQUAL, OP_NOT); break;
-
-    case TOKEN_GREATER: EMIT_BYTE(parser, OP_GREATER); break;
-    case TOKEN_GREATER_EQUAL: stream(parser, 2, OP_LESS, OP_NOT); break;
-    case TOKEN_LESS: EMIT_BYTE(parser, OP_LESS); break;
-    case TOKEN_LESS_EQUAL: stream(parser, 2, OP_GREATER, OP_NOT); break;
-
-    default: return;
-  }
-}
-
-static void synchronize(Parser* parser) {
-  parser->panic = false;
-
-  while (parser->current.type != TOKEN_EOF) {
-    if (parser->previous.type == TOKEN_SEMICOLON) return;
-
-    switch (parser->current.type) {
-      case TOKEN_DEFINE:
-      case TOKEN_SET:
-      case TOKEN_FOR:
-      case TOKEN_IF:
-      case TOKEN_WHILE:
-      case TOKEN_RETURN:
-        return;
-    }
-
-    advance(parser);
-  }
 }
 
 static bool identifiers_equality(Token* left, Token* right) {
@@ -486,8 +380,27 @@ static void close_scope(Parser* parser) {
   EMIT_BYTE(parser, counter);
 }
 
-static void memory(Parser* parser, Token identifier, bool assign) {
-  uint8_t setter, getter;
+static uint8_t arguments(Parser* parser) {
+  uint8_t count = 0;
+
+  if (check(parser, TOKEN_CLOSE_PARENTHESES) == false) {
+    do {
+      expression(parser);
+
+      if (count == 255)
+        error(parser, parser->previous, compile_time_errors[MAXIMUM_ARGUMENTS]);
+
+      count++;
+    } while (match(parser, TOKEN_COMMA) == true);
+  }
+
+  consume(parser, TOKEN_CLOSE_PARENTHESES, compile_time_errors[EXPECT_ARGUMENTS]);
+
+  return count;
+}
+
+static void emit_variable(Parser* parser, Token identifier, bool assign) {
+  uint8_t setter = 0, getter = 0;
 
   int argument = resolve(parser, parser->compiler, &identifier);
 
@@ -508,11 +421,9 @@ static void memory(Parser* parser, Token identifier, bool assign) {
     }
   }
 
-  uint8_t operation;
-
   if (assign && match(parser, TOKEN_ASSIGN)) {
     expression(parser);
-    operation = setter;
+    EMIT_BYTE(parser, setter);
   }
   else if (assign && match(parser, TOKEN_INCREMENT)) {
     EMIT_BYTE(parser, getter);
@@ -521,7 +432,7 @@ static void memory(Parser* parser, Token identifier, bool assign) {
     constant(parser, OBJECT(allocate_number_from_double(parser->vm, 1.0)));
 
     EMIT_BYTE(parser, OP_ADD);
-    operation = setter;
+    EMIT_BYTE(parser, setter);
   }
   else if (assign && match(parser, TOKEN_DECREMENT)) {
     EMIT_BYTE(parser, getter);
@@ -530,15 +441,14 @@ static void memory(Parser* parser, Token identifier, bool assign) {
     constant(parser, OBJECT(allocate_number_from_double(parser->vm, 1.0)));
 
     EMIT_BYTE(parser, OP_SUBTRACT);
-    operation = setter;
+    EMIT_BYTE(parser, setter);
   }
-  else operation = getter;
+  else EMIT_BYTE(parser, getter);
 
-  EMIT_BYTE(parser, operation);
   EMIT_BYTE(parser, argument);
 }
 
-static void frame(Parser* parser, Positions position, bool assign) {
+static void emit_function(Parser* parser, Positions position, bool assign) {
   Compiler compiler;
 
   set_compiler(parser, &compiler, position);
@@ -585,14 +495,6 @@ static void frame(Parser* parser, Positions position, bool assign) {
   }
 }
 
-static void variable(Parser* parser, bool assign) {
-  memory(parser, parser->previous, assign);
-}
-
-static void function(Parser* parser, bool assign) {
-  frame(parser, POSITION_FUNCTION, assign);
-};
-
 static void patch(Parser* parser, int offset) {
   int jump = GET_CURRENT_CHUNK(parser->compiler)->count - offset - 2;
 
@@ -624,6 +526,90 @@ static void loop(Parser* parser, int start) {
   EMIT_BYTE(parser, offset & 0xff);
 }
 
+static void grouping(Parser* parser, bool assign) {
+  expression(parser);
+
+  consume(parser, TOKEN_CLOSE_PARENTHESES, "Expect a close parentheses after expression.");
+}
+
+static void unary(Parser* parser, bool assign) {
+  Types operator = parser->previous.type;
+
+  parse(parser, PRECEDENCE_UNARY);
+
+  switch (operator) {
+    case TOKEN_MINUS: EMIT_BYTE(parser, OP_NEGATION); break;
+
+    case TOKEN_NOT: EMIT_BYTE(parser, OP_NOT); break;
+
+    default: return;
+  }
+}
+
+static void binary(Parser* parser, bool assign) {
+  Types operator = parser->previous.type;
+
+  Rule* rule = &rules[operator];
+
+  Precedences precedence = (Precedences)(rule->precedence + 1);
+
+  parse(parser, precedence);
+
+  switch (operator) {
+    case TOKEN_PLUS: EMIT_BYTE(parser, OP_ADD); break;
+    case TOKEN_MINUS: EMIT_BYTE(parser, OP_SUBTRACT); break;
+    case TOKEN_ASTERISK: EMIT_BYTE(parser, OP_MULTIPLY); break;
+    case TOKEN_SLASH: EMIT_BYTE(parser, OP_DIVIDE); break;
+
+    case TOKEN_CARET: EMIT_BYTE(parser, OP_POWER); break;
+
+    case TOKEN_EQUAL: EMIT_BYTE(parser, OP_EQUAL); break;
+    case TOKEN_NOT_EQUAL: stream(parser, 2, OP_EQUAL, OP_NOT); break;
+
+    case TOKEN_GREATER: EMIT_BYTE(parser, OP_GREATER); break;
+    case TOKEN_GREATER_EQUAL: stream(parser, 2, OP_LESS, OP_NOT); break;
+    case TOKEN_LESS: EMIT_BYTE(parser, OP_LESS); break;
+    case TOKEN_LESS_EQUAL: stream(parser, 2, OP_GREATER, OP_NOT); break;
+
+    default: return;
+  }
+}
+
+static void number(Parser* parser, bool assign) {
+  char string[parser->previous.length + 1];
+
+  strncpy(string, parser->previous.start, parser->previous.length + 1);
+
+  string[parser->previous.length] = '\0';
+
+  Number* number = allocate_number_from_string(parser->vm, string);
+
+  Value value = OBJECT(number);
+
+  constant(parser, value);
+}
+
+static void string(Parser* parser, bool assign) {
+  String* string = copy_string(parser->vm, parser->previous.start + 1, parser->previous.length - 2);
+
+  Value value = OBJECT(string);
+
+  constant(parser, value);
+}
+
+static void literal(Parser* parser, bool assign) {
+  switch (parser->previous.type) {
+    case TOKEN_TRUE: EMIT_BYTE(parser, OP_TRUE); break;
+    case TOKEN_FALSE: EMIT_BYTE(parser, OP_FALSE); break;
+
+    case TOKEN_VOID: EMIT_BYTE(parser, OP_VOID); break;
+
+    case TOKEN_UNDEFINED: EMIT_BYTE(parser, OP_UNDEFINED); break;
+
+    default: return;
+  }
+}
+
 static void and(Parser* parser, bool assign) {
   int end = jump(parser, OP_JUMP_CONDITIONAL);
 
@@ -648,112 +634,33 @@ static void or(Parser* parser, bool assign) {
   patch(parser, end);
 }
 
-static void set(Parser* parser, bool force) {
-  do {
-    uint8_t global = definition(parser, compile_time_errors[EXPECT_VARIABLE_IDENTIFIER], force);
+static void ternary(Parser* parser, bool assign) {
+  int then = jump(parser, OP_JUMP_CONDITIONAL);
 
-    if (match(parser, TOKEN_COLON))
-      expression(parser);
-    else EMIT_BYTE(parser, OP_UNDEFINED);
+  EMIT_BYTE(parser, OP_POP);
 
-    initialize(parser, global, force);
-  } while(match(parser, TOKEN_COMMA));
+  expression(parser);
 
-  consume(parser, TOKEN_SEMICOLON, compile_time_errors[EXPECT_SEMICOLON]);
+  int otherwise = jump(parser, OP_JUMP);
+
+  patch(parser, then);
+
+  EMIT_BYTE(parser, OP_POP);
+
+  consume(parser, TOKEN_COLON, compile_time_errors[EXPECT_COLON_TERNARY]);
+
+  expression(parser);
+
+  patch(parser, otherwise);
 }
 
-static void define(Parser* parser, bool force) {
-  uint8_t global = definition(parser, compile_time_errors[EXPECT_FUNCTION_IDENTIFIER], force);
-  mark(parser, force);
-  frame(parser, POSITION_FUNCTION, false);
-  initialize(parser, global, force);
+static void variable(Parser* parser, bool assign) {
+  emit_variable(parser, parser->previous, assign);
 }
 
-static void class(Parser* parser, bool force) {
-  consume(parser, TOKEN_IDENTIFIER, compile_time_errors[EXPECT_CLASS_IDENTIFIER]);
-
-  Token class = parser->previous;
-
-  uint8_t global = identify(parser, &parser->previous);
-
-  declaration(parser, force);
-
-  EMIT_BYTE(parser, OP_CLASS);
-  EMIT_BYTE(parser, global);
-  
-  initialize(parser, global, force);
-
-  Entity entity;
-
-  entity.enclosing = parser->entity;
-  entity.name = parser->previous;
-  entity.inheritance = false;
-
-  parser->entity = &entity;
-
-  memory(parser, class, false);
-
-  if (match(parser, TOKEN_SEMICOLON) == false) {
-    consume(parser, TOKEN_OPEN_BRACES, compile_time_errors[EXPECT_OPEN_CLASS]);
-
-    while (check(parser, TOKEN_CLOSE_BRACES) == false) {
-      if (check(parser, TOKEN_EOF) == true) break;
-
-      Positions position;
-
-      if (match(parser, TOKEN_STATIC) == false) {
-        Token method = parser->current;
-
-        if (method.length == class.length && memcmp(method.start, class.start, class.length) == 0)
-          position = POSITION_CONSTRUCTOR;
-        else position = POSITION_METHOD;
-      }
-      else position = POSITION_FUNCTION;
-
-      consume(parser, TOKEN_IDENTIFIER, compile_time_errors[EXPECT_METHOD_IDENTIFIER]);
-
-      uint8_t constant = identify(parser, &parser->previous);
-
-      frame(parser, position, false);
-
-      EMIT_BYTE(parser, position == POSITION_FUNCTION ? OP_FUNCTION : OP_METHOD);
-
-      EMIT_BYTE(parser, constant);
-    }
-
-    consume(parser, TOKEN_CLOSE_BRACES, compile_time_errors[EXPECT_CLOSE_CLASS]);
-
-    EMIT_BYTE(parser, OP_POP);
-
-    parser->entity = parser->entity->enclosing;
-  }
-}
-
-static void block(Parser* parser) {
-  while (check(parser, TOKEN_CLOSE_BRACES) == false && check(parser, TOKEN_EOF) == false) 
-    instruction(parser);
-
-  consume(parser, TOKEN_CLOSE_BRACES, compile_time_errors[EXPECT_BLOCK]);
-}
-
-static uint8_t arguments(Parser* parser) {
-  uint8_t count = 0;
-
-  if (check(parser, TOKEN_CLOSE_PARENTHESES) == false) {
-    do {
-      expression(parser);
-
-      if (count == 255)
-        error(parser, parser->previous, compile_time_errors[MAXIMUM_ARGUMENTS]);
-
-      count++;
-    } while (match(parser, TOKEN_COMMA) == true);
-  }
-
-  consume(parser, TOKEN_CLOSE_PARENTHESES, compile_time_errors[EXPECT_ARGUMENTS]);
-
-  return count;
-}
+static void function(Parser* parser, bool assign) {
+  emit_function(parser, POSITION_FUNCTION, assign);
+};
 
 static void call(Parser* parser, bool assign) {
   uint8_t count = arguments(parser);
@@ -772,6 +679,14 @@ static void accessor(Parser* parser, bool assign) {
     EMIT_BYTE(parser, OP_PROPERTY_SET);
     EMIT_BYTE(parser, property);
   }
+  else if (match(parser, TOKEN_OPEN_PARENTHESES) == true) {
+    uint8_t count = arguments(parser);
+
+    EMIT_BYTE(parser, OP_INVOKE);
+    EMIT_BYTE(parser, property);
+
+    EMIT_BYTE(parser, count);
+  }
   else {
     EMIT_BYTE(parser, OP_PROPERTY_GET);
     EMIT_BYTE(parser, property);
@@ -780,8 +695,100 @@ static void accessor(Parser* parser, bool assign) {
 
 static void this(Parser* parser, bool assign) {
   if (parser->compiler->position == POSITION_METHOD || parser->compiler->position == POSITION_CONSTRUCTOR)
-    memory(parser, parser->previous, false);
+    emit_variable(parser, parser->previous, false);
   else error(parser, parser->previous, compile_time_errors[CANNOT_USE_THIS]);
+}
+
+static void set(Parser* parser, bool force) {
+  do {
+    uint8_t global = definition(parser, compile_time_errors[EXPECT_VARIABLE_IDENTIFIER], force);
+
+    if (match(parser, TOKEN_COLON))
+      expression(parser);
+    else EMIT_BYTE(parser, OP_UNDEFINED);
+
+    initialize(parser, global, force);
+  } while(match(parser, TOKEN_COMMA));
+
+  consume(parser, TOKEN_SEMICOLON, compile_time_errors[EXPECT_SEMICOLON]);
+}
+
+static void define(Parser* parser, bool force) {
+  uint8_t global = definition(parser, compile_time_errors[EXPECT_FUNCTION_IDENTIFIER], force);
+  mark(parser, force);
+  emit_function(parser, POSITION_FUNCTION, false);
+  initialize(parser, global, force);
+}
+
+static void class(Parser* parser, bool force) {
+  consume(parser, TOKEN_IDENTIFIER, compile_time_errors[EXPECT_CLASS_IDENTIFIER]);
+
+  Token class = parser->previous;
+
+  uint8_t constant = identify(parser, &parser->previous);
+
+  declaration(parser, force);
+
+  EMIT_BYTE(parser, OP_CLASS);
+  EMIT_BYTE(parser, constant);
+  
+  initialize(parser, constant, force);
+
+  emit_variable(parser, class, false);
+
+  if (match(parser, TOKEN_SEMICOLON) == false) {
+    consume(parser, TOKEN_OPEN_BRACES, compile_time_errors[EXPECT_OPEN_CLASS]);
+
+    while (check(parser, TOKEN_CLOSE_BRACES) == false) {
+      if (check(parser, TOKEN_EOF) == true) break;
+
+      if (check(parser, TOKEN_SET) == false && check(parser, TOKEN_DEFINE) == false) {
+        error(parser, parser->current, compile_time_errors[EXPECT_SET_DEFINE]);
+
+        break;
+      }
+
+      if (match(parser, TOKEN_SET) == true) {
+        do {
+          consume(parser, TOKEN_IDENTIFIER, compile_time_errors[EXPECT_MEMBER_IDENTIFIER]);
+
+          uint8_t constant = identify(parser, &parser->previous);
+
+          if (match(parser, TOKEN_COLON) == true)
+            expression(parser);
+          else EMIT_BYTE(parser, OP_UNDEFINED);
+
+          EMIT_BYTE(parser, OP_MEMBER);
+          EMIT_BYTE(parser, constant);
+        } while(match(parser, TOKEN_COMMA) == true);
+
+        consume(parser, TOKEN_SEMICOLON, compile_time_errors[EXPECT_SEMICOLON]);
+      }
+
+      if (match(parser, TOKEN_DEFINE) == true) {
+        Positions position;
+
+        Token method = parser->current;
+
+        if (memcmp(method.start, class.start, method.length > class.length ? method.length : class.length) == 0)
+          position = POSITION_CONSTRUCTOR;
+        else position = POSITION_METHOD;
+
+        consume(parser, TOKEN_IDENTIFIER, compile_time_errors[EXPECT_METHOD_IDENTIFIER]);
+
+        uint8_t constant = identify(parser, &parser->previous);
+
+        emit_function(parser, position, false);
+
+        EMIT_BYTE(parser, OP_METHOD);
+        EMIT_BYTE(parser, constant);
+      }
+    }
+
+    consume(parser, TOKEN_CLOSE_BRACES, compile_time_errors[EXPECT_CLOSE_CLASS]);
+  }
+
+  EMIT_BYTE(parser, OP_POP);
 }
 
 static void conditional(Parser* parser) {
@@ -908,6 +915,39 @@ static void looping(Parser* parser) {
   close_scope(parser);
 }
 
+static void synchronize(Parser* parser) {
+  parser->panic = false;
+
+  while (parser->current.type != TOKEN_EOF) {
+    if (parser->previous.type == TOKEN_SEMICOLON) return;
+
+    switch (parser->current.type) {
+      case TOKEN_SET:
+      case TOKEN_DEFINE:
+      case TOKEN_CLASS:
+      case TOKEN_FOR:
+      case TOKEN_IF:
+      case TOKEN_WHILE:
+      case TOKEN_DO:
+      case TOKEN_RETURN:
+        return;
+    }
+
+    advance(parser);
+  }
+}
+
+static void expression(Parser* parser) {
+  parse(parser, PRECEDENCE_ASSIGNMENT);
+}
+
+static void block(Parser* parser) {
+  while (check(parser, TOKEN_CLOSE_BRACES) == false && check(parser, TOKEN_EOF) == false) 
+    instruction(parser);
+
+  consume(parser, TOKEN_CLOSE_BRACES, compile_time_errors[EXPECT_BLOCK]);
+}
+
 static void statement(Parser* parser) {
   if (match(parser, TOKEN_SEMICOLON) == true) return;
 
@@ -1010,9 +1050,7 @@ Function* compile(VM* vm, const char* source) {
 
   parser.compiler = NULL;
 
-  parser.entity = NULL;
-
-  parser.error = false; parser.panic = false;
+  parser.panic = false; parser.error = false;
 
   set_tokenizer(&parser.tokenizer, source);
 
@@ -1025,7 +1063,7 @@ Function* compile(VM* vm, const char* source) {
   while (match(&parser, TOKEN_EOF) == false)
     instruction(&parser);
 
-  Function* function = terminate(&parser);
-
-  return parser.error ? NULL : function;
+  if (parser.error == false)
+    return terminate(&parser);
+  else return NULL;
 }

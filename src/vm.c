@@ -14,12 +14,17 @@
 void initialize_VM(VM* vm) {
   vm->frames = NULL;
   vm->objects = NULL;
+  vm->upvalues = NULL;
 
   vm->allocate = 0;
 
   vm->threshold = DEFAULT_THRESHOLD;
 
-  reset(vm);
+  vm->count = 0;
+  vm->capacity = FRAME_DEFAULT_SIZE;
+  vm->frames = ALLOCATE_ARRAY(vm, Frame, vm->frames, 0 , vm->capacity);
+
+  vm->stack.top = vm->stack.content;
 
   initialize_table(&vm->strings, vm);
   initialize_table(&vm->globals, vm);
@@ -43,16 +48,6 @@ void free_VM(VM* vm) {
   free_table(&vm->globals); 
 
   FREE_ARRAY(vm, Frame, vm->frames, vm->capacity);
-}
-
-void reset(VM* vm) {
-  vm->count = 0;
-  vm->capacity = FRAME_DEFAULT_SIZE;
-  vm->frames = ALLOCATE_ARRAY(vm, Frame, vm->frames, 0 , vm->capacity);
-  
-  vm->upvalues = NULL;
-
-  vm->stack.top = vm->stack.content;
 }
 
 void native(VM* vm, const char* identifier, Internal internal) {
@@ -81,6 +76,8 @@ static void error(VM* vm, const char* message, ...) {
 
   fputs("\n", stderr);
 
+  size_t error = 0, counter = 0;
+
   for (int i = vm->count - 1; i >= 0; i--) {
     Frame* frame = &vm->frames[i];
 
@@ -88,17 +85,27 @@ static void error(VM* vm, const char* message, ...) {
 
     size_t instruction = frame->ip - function->chunk.code - 1;
 
-    fprintf(stderr, "[Line N°%d] in ", function->chunk.lines[instruction]);
+    if (error == instruction) {
+      counter++;
+      continue;
+    }
+
+    if (counter != 0) 
+      fprintf(stderr, "- The above line repeats %d times. -\n", counter);
+
+    error = instruction;
+
+    fprintf(stderr, "[Line N°%d] in ", function->chunk.lines[error]);
 
     if (i == 0)
-      fprintf(stderr, "Script.\n");
+      fprintf(stderr, "Top-Level.\n");
     else if (function->identifier == NULL) 
       fprintf(stderr, "an anonymous Function\n");
     else 
       fprintf(stderr, "'%s' Function\n", function->identifier->content);
-  }
 
-  reset(vm);
+    counter = 0;
+  }
 }
 
 static bool invoke(VM* vm, Closure* closure, int count) {
@@ -215,31 +222,24 @@ static Upvalue* capture(VM* vm, Value* local) {
 static void close(VM* vm, Value* last) {
   while (vm->upvalues != NULL && vm->upvalues->location >= last) {
     Upvalue* upvalue = vm->upvalues;
+
     upvalue->closed = *upvalue->location;
     upvalue->location = &upvalue->closed;
+    
     vm->upvalues = upvalue->next;
   }
 }
 
-static bool execute(VM* vm, Table table, String* property) {
+static bool method(VM* vm, Class* class, String* identifier, int count) {
   Value method;
 
-  if (table_get(&table, property, &method) == false) {
-    error(vm, run_time_errors[UNDEFINED_PROPERTY], property->content);
+  if (table_get(&class->methods, identifier, &method) == false) {
+    error(vm, run_time_errors[UNDEFINED_PROPERTY], identifier->content);
+
     return false;
   }
 
-  Value receiver = peek(&vm->stack, 0);
-
-  Closure* closure = AS_CLOSURE(method);
-
-  pop(&vm->stack, 1);
-
-  if (OBJECT_TYPE(receiver) == OBJECT_INSTANCE)
-    push(&vm->stack, OBJECT(new_bound(vm, receiver, closure)));
-  else push(&vm->stack, OBJECT(closure));
-
-  return true;
+  return invoke(vm, AS_CLOSURE(method), count);
 }
 
 static Results run(VM* vm) {
@@ -586,66 +586,10 @@ static Results run(VM* vm) {
     COMPUTE_NEXT();
   }
 
-  OP_PROPERTY_SET: {
-    if (IS_INSTANCE(peek(&vm->stack, 1)) == false) {
-      error(vm, run_time_errors[CANNOT_HAVE_PROPERTIES]);
-
-      return INTERPRET_RUNTIME_ERROR;
-    }
-
-    Instance* instance = AS_INSTANCE(peek(&vm->stack, 1));
-
-    String* property = AS_STRING(READ_CONSTANT());
-
-    table_set(&instance->fields, property, peek(&vm->stack, 0));
-
-    Value value = pop(&vm->stack, 1);
-    pop(&vm->stack, 1);
-    push(&vm->stack, value);
-
-    COMPUTE_NEXT();
-  }
-
-  OP_PROPERTY_GET: {
-    Value caller = peek(&vm->stack, 0);
-
-    String* property = AS_STRING(READ_CONSTANT());
-
-    if (IS_INSTANCE(caller) == true) {
-      Instance* instance = AS_INSTANCE(caller);
-
-      Value value;
-
-      if (table_get(&instance->fields, property, &value) == true) {
-        pop(&vm->stack, 1);
-        push(&vm->stack, value);
-        COMPUTE_NEXT();
-      }
-
-      if (execute(vm, instance->class->methods, property) == false)
-        return INTERPRET_RUNTIME_ERROR;
-
-      COMPUTE_NEXT();
-    }
-
-    if (IS_CLASS(caller) == true) {
-      Class* class = AS_CLASS(caller);
-
-      if (execute(vm, class->functions, property) == false)
-        return INTERPRET_RUNTIME_ERROR;
-
-      COMPUTE_NEXT();
-    }
-
-    error(vm, run_time_errors[CANNOT_HAVE_PROPERTIES]);
-
-    return INTERPRET_RUNTIME_ERROR;
-  }
-
-  OP_FUNCTION: {
+  OP_MEMBER: {
     Value property = peek(&vm->stack, 0);
     Class* class = AS_CLASS(peek(&vm->stack, 1));
-    table_set(&class->functions, AS_STRING(READ_CONSTANT()), property);
+    table_set(&class->members, AS_STRING(READ_CONSTANT()), property);
     pop(&vm->stack, 1);
     COMPUTE_NEXT();
   }
@@ -655,6 +599,91 @@ static Results run(VM* vm) {
     Class* class = AS_CLASS(peek(&vm->stack, 1));
     table_set(&class->methods, AS_STRING(READ_CONSTANT()), property);
     pop(&vm->stack, 1);
+    COMPUTE_NEXT();
+  }
+
+  OP_PROPERTY_SET: {
+    if (IS_INSTANCE(peek(&vm->stack, 1)) == true) {
+      Instance* instance = AS_INSTANCE(peek(&vm->stack, 1));
+
+      String* property = AS_STRING(READ_CONSTANT());
+
+      Value value = pop(&vm->stack, 1);
+
+      if (
+        table_set(&instance->fields, property, value) == false ||
+        table_set(&instance->class->methods, property, value) == false
+      ) {
+        pop(&vm->stack, 1);
+        push(&vm->stack, value);
+        COMPUTE_NEXT();
+      }
+
+      error(vm, run_time_errors[UNDEFINED_PROPERTY], property->content);
+
+      return INTERPRET_RUNTIME_ERROR;
+    }
+
+    error(vm, run_time_errors[CANNOT_HAVE_PROPERTIES]);
+
+    return INTERPRET_RUNTIME_ERROR;
+  }
+
+  OP_PROPERTY_GET: {
+    if (IS_INSTANCE(peek(&vm->stack, 0)) == true) {
+      Instance* instance = AS_INSTANCE(peek(&vm->stack, 0));
+
+      String* property = AS_STRING(READ_CONSTANT());
+
+      Value value;
+
+      if (
+        table_get(&instance->fields, property, &value) == true ||
+        table_get(&instance->class->methods, property, &value) == true
+      ) {
+        pop(&vm->stack, 1);
+        push(&vm->stack, value);
+        COMPUTE_NEXT();
+      }
+
+      error(vm, run_time_errors[UNDEFINED_PROPERTY], property->content);
+
+      return INTERPRET_RUNTIME_ERROR;
+    }
+
+    error(vm, run_time_errors[CANNOT_HAVE_PROPERTIES]);
+
+    return INTERPRET_RUNTIME_ERROR;
+  }
+
+  OP_INVOKE: {
+    String* identifier = AS_STRING(READ_CONSTANT());
+
+    int count = READ_BYTE();
+
+    Value receiver = peek(&vm->stack, count);
+
+    if (IS_INSTANCE(receiver) == false) {
+      error(vm, run_time_errors[ONLY_INSTANCES_HAVE_METHODS]);
+
+      return INTERPRET_RUNTIME_ERROR;
+    }
+
+    Instance* instance = AS_INSTANCE(receiver);
+
+    Value value;
+
+    if (table_get(&instance->fields, identifier, &value) == true) {
+      vm->stack.top[- count - 1] = value;
+      
+      return call(vm, value, count);
+    }
+
+    if (method(vm, instance->class, identifier, count) == false)
+      return INTERPRET_RUNTIME_ERROR;
+
+    frame = &vm->frames[vm->count - 1];
+
     COMPUTE_NEXT();
   }
 

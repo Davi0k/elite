@@ -49,29 +49,21 @@ typedef struct Compiler {
 
   Positions position;
 
-  Up ups[MAXIMUM_LIMIT];
-
   Local locals[MAXIMUM_LIMIT];
   int count;
   int scope;
+
+  Up ups[MAXIMUM_LIMIT];
 } Compiler;
 
-typedef struct Current {
-  struct Current* enclosing;
-  Token name;
-  bool inheritance;
-} Entity;
-
 typedef struct {
+  bool panic, error;
+
   Tokenizer tokenizer;
 
   Token previous, current;
 
-  bool panic, error;
-
   Compiler* compiler;
-
-  Entity* entity;
 
   VM* vm;
 } Parser;
