@@ -36,7 +36,8 @@ const char* compile_time_errors[] = {
   [EXPECT_CLOSE_CLASS] = "Expect '}' after Class body.",
   [EXPECT_PROPERTY_IDENTIFIER] = "Expect property identifier.",
   [EXPECT_METHOD_IDENTIFIER] = "Expect method identifier.",
-  [CANNOT_USE_THIS] = "Cannot use 'this' outiside of a class method."
+  [CANNOT_USE_THIS] = "Cannot use 'this' outiside of a class method.",
+  [CANNOT_RETURN_CONSTRUCTOR] = "Cannot return a value from a constructor."
 };
 
 const char* run_time_errors[] = {

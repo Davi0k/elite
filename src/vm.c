@@ -81,8 +81,6 @@ static void error(VM* vm, const char* message, ...) {
 
   fputs("\n", stderr);
 
-  int previous = 0, counter = 0;
-
   for (int i = vm->count - 1; i >= 0; i--) {
     Frame* frame = &vm->frames[i];
 
@@ -90,20 +88,7 @@ static void error(VM* vm, const char* message, ...) {
 
     size_t instruction = frame->ip - function->chunk.code - 1;
 
-    if (previous == function->chunk.lines[instruction]) {
-      counter = counter + 1;
-
-      continue;
-    }
-
-    if (counter != 0) {
-      fprintf(stderr, "- The above line repeats %d times. -\n", counter);
-      counter = 0;
-    }
-
-    previous = function->chunk.lines[instruction];
-
-    fprintf(stderr, "[Line N°%d] in ", previous);
+    fprintf(stderr, "[Line N°%d] in ", function->chunk.lines[instruction]);
 
     if (i == 0)
       fprintf(stderr, "Script.\n");
@@ -146,10 +131,10 @@ static bool invoke(VM* vm, Closure* closure, int count) {
 
 static bool call(VM* vm, Value value, int count) {
   if (IS_OBJECT(value)) {
-    switch (OBJECT_TYPE(value)) {
-      case OBJECT_CLOSURE:
-        return invoke(vm, AS_CLOSURE(value), count);
+    if (OBJECT_TYPE(value) == OBJECT_CLOSURE)
+      return invoke(vm, AS_CLOSURE(value), count);
 
+    switch (OBJECT_TYPE(value)) {
       case OBJECT_NATIVE: {
         Handler handler;
 
@@ -171,13 +156,28 @@ static bool call(VM* vm, Value value, int count) {
 
       case OBJECT_CLASS: {
         Class* class = AS_CLASS(value);
+
         vm->stack.top[- count - 1] = OBJECT(new_instance(vm, class));
+
+        Value constructor;
+
+        if (table_get(&class->methods, class->identifier, &constructor))
+          return invoke(vm, AS_CLOSURE(constructor), count);
+
+        if (count != 0) {
+          error(vm, run_time_errors[EXPECT_ARGUMENTS_NUMBER], 0, count);
+
+          return false;
+        }
+
         return true;
       } 
 
       case OBJECT_BOUND: {
         Bound* bound = AS_BOUND(value);
+
         vm->stack.top[- count - 1] = bound->receiver;
+        
         return invoke(vm, bound->method, count);
       }
     }
@@ -305,7 +305,7 @@ static Results run(VM* vm) {
 
   OP_UNDEFINED: push(&vm->stack, UNDEFINED); COMPUTE_NEXT();
 
-  OP_NEGATION:
+  OP_NEGATION: {
     if (!IS_NUMBER(peek(&vm->stack, 0))) {
       error(vm, run_time_errors[MUST_BE_NUMBER]);
 
@@ -323,8 +323,9 @@ static Results run(VM* vm) {
     mpf_clear(result);
 
     COMPUTE_NEXT();
+  }
   
-  OP_ADD: 
+  OP_ADD: {
     if (IS_STRING(peek(&vm->stack, 0)) && IS_STRING(peek(&vm->stack, 1))) {
       String* right = AS_STRING(peek(&vm->stack, 0));
       String* left = AS_STRING(peek(&vm->stack, 1));
@@ -356,6 +357,7 @@ static Results run(VM* vm) {
     error(vm, run_time_errors[MUST_BE_NUMBERS_OR_STRINGS]);
 
     return INTERPRET_RUNTIME_ERROR;
+  }
 
   OP_SUBTRACT: BINARY_OPERATION(mpf_sub); COMPUTE_NEXT();
 
@@ -642,25 +644,17 @@ static Results run(VM* vm) {
 
   OP_FUNCTION: {
     Value property = peek(&vm->stack, 0);
-
     Class* class = AS_CLASS(peek(&vm->stack, 1));
-
     table_set(&class->functions, AS_STRING(READ_CONSTANT()), property);
-
     pop(&vm->stack, 1);
-
     COMPUTE_NEXT();
   }
 
   OP_METHOD: {
     Value property = peek(&vm->stack, 0);
-
     Class* class = AS_CLASS(peek(&vm->stack, 1));
-
     table_set(&class->methods, AS_STRING(READ_CONSTANT()), property);
-
     pop(&vm->stack, 1);
-
     COMPUTE_NEXT();
   }
 
@@ -690,7 +684,7 @@ Results interpret(VM* vm, const char* source) {
   pop(&vm->stack, 1);
   push(&vm->stack, value);
 
-  call(vm, value, 0);
+  invoke(vm, closure, 0);
 
   return run(vm);
 }

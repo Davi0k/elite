@@ -158,7 +158,12 @@ Rule rules[] = {
 };
 
 static Function* terminate(Parser* parser) {
-  EMIT_BYTE(parser, OP_UNDEFINED);
+  if (parser->compiler->position == POSITION_CONSTRUCTOR) {
+    EMIT_BYTE(parser, OP_LOCAL_GET);
+    EMIT_BYTE(parser, 0);
+  }
+  else EMIT_BYTE(parser, OP_UNDEFINED);
+
   EMIT_BYTE(parser, OP_RETURN);
 
   Function* function = parser->compiler->function;
@@ -667,7 +672,7 @@ static void define(Parser* parser, bool force) {
 static void class(Parser* parser, bool force) {
   consume(parser, TOKEN_IDENTIFIER, compile_time_errors[EXPECT_CLASS_IDENTIFIER]);
 
-  Token identifier = parser->previous;
+  Token class = parser->previous;
 
   uint8_t global = identify(parser, &parser->previous);
 
@@ -686,7 +691,7 @@ static void class(Parser* parser, bool force) {
 
   parser->entity = &entity;
 
-  memory(parser, identifier, false);
+  memory(parser, class, false);
 
   if (match(parser, TOKEN_SEMICOLON) == false) {
     consume(parser, TOKEN_OPEN_BRACES, compile_time_errors[EXPECT_OPEN_CLASS]);
@@ -696,9 +701,14 @@ static void class(Parser* parser, bool force) {
 
       Positions position;
 
-      if (match(parser, TOKEN_STATIC) == true)
-        position = POSITION_FUNCTION;
-      else position = POSITION_METHOD;
+      if (match(parser, TOKEN_STATIC) == false) {
+        Token method = parser->current;
+
+        if (method.length == class.length && memcmp(method.start, class.start, class.length) == 0)
+          position = POSITION_CONSTRUCTOR;
+        else position = POSITION_METHOD;
+      }
+      else position = POSITION_FUNCTION;
 
       consume(parser, TOKEN_IDENTIFIER, compile_time_errors[EXPECT_METHOD_IDENTIFIER]);
 
@@ -917,6 +927,9 @@ static void statement(Parser* parser) {
   else if (match(parser, TOKEN_RETURN)) {
     if (parser->compiler->position == POSITION_SCRIPT)
       error(parser, parser->previous, compile_time_errors[CANNOT_RETURN_SCRIPT]);
+
+    if (parser->compiler->position == POSITION_CONSTRUCTOR)
+      error(parser, parser->previous, compile_time_errors[CANNOT_RETURN_CONSTRUCTOR]);
 
     if (check(parser, TOKEN_SEMICOLON) == false) 
       expression(parser);
