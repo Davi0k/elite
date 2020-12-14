@@ -42,6 +42,12 @@ typedef struct {
   bool local;
 } Up;
 
+typedef struct Entity {
+  struct Entity* enclosing;
+  Token name;
+  bool inheritance;
+} Entity;
+
 typedef struct Compiler {
   struct Compiler* enclosing;
 
@@ -62,6 +68,8 @@ typedef struct {
   Tokenizer tokenizer;
 
   Token previous, current;
+
+  Entity* entity;
 
   Compiler* compiler;
 

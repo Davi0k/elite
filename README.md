@@ -105,14 +105,14 @@ define fibonacci(n) {
 	    return n;
     
     return fibonacci(n - 1) + fibonacci(n - 2);
-}
+};
 
 #Defining a recursive function to calculate the factorial
 define factorial(n) {
     if n > 0: 
 	    return n * factorial(n - 1);
     else: return 1;
-}
+};
 
 set start, stop; #Define some global variables
 
@@ -140,7 +140,7 @@ class Triangle {
         this.A = A;
         this.B = B;
         this.C = C;
-    }
+    };
 
     define check: this.A + this.B + this.C == 180;
 }

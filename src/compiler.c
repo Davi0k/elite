@@ -479,7 +479,6 @@ static void emit_function(Parser* parser, Positions position, bool assign) {
   else {
     expression(parser);
     EMIT_BYTE(parser, OP_RETURN);
-    consume(parser, TOKEN_SEMICOLON, compile_time_errors[EXPECT_SEMICOLON]);
   }
 
   Function* function = terminate(parser);
@@ -708,16 +707,20 @@ static void set(Parser* parser, bool force) {
     else EMIT_BYTE(parser, OP_UNDEFINED);
 
     initialize(parser, global, force);
-  } while(match(parser, TOKEN_COMMA));
+  } while(match(parser, TOKEN_COMMA) == true);
 
   consume(parser, TOKEN_SEMICOLON, compile_time_errors[EXPECT_SEMICOLON]);
 }
 
 static void define(Parser* parser, bool force) {
-  uint8_t global = definition(parser, compile_time_errors[EXPECT_FUNCTION_IDENTIFIER], force);
-  mark(parser, force);
-  emit_function(parser, POSITION_FUNCTION, false);
-  initialize(parser, global, force);
+  do {
+    uint8_t global = definition(parser, compile_time_errors[EXPECT_FUNCTION_IDENTIFIER], force);
+    mark(parser, force);
+    emit_function(parser, POSITION_FUNCTION, false);
+    initialize(parser, global, force);
+  } while(match(parser, TOKEN_COMMA) == true);
+
+  consume(parser, TOKEN_SEMICOLON, compile_time_errors[EXPECT_SEMICOLON]);
 }
 
 static void class(Parser* parser, bool force) {
@@ -734,6 +737,14 @@ static void class(Parser* parser, bool force) {
   
   initialize(parser, constant, force);
 
+  Entity entity;
+
+  entity.enclosing = parser->entity;
+  entity.name = parser->previous;
+  entity.inheritance = false;
+
+  parser->entity = &entity;
+
   emit_variable(parser, class, false);
 
   if (match(parser, TOKEN_SEMICOLON) == false) {
@@ -743,7 +754,7 @@ static void class(Parser* parser, bool force) {
       if (check(parser, TOKEN_EOF) == true) break;
 
       if (check(parser, TOKEN_SET) == false && check(parser, TOKEN_DEFINE) == false) {
-        error(parser, parser->current, compile_time_errors[EXPECT_SET_DEFINE]);
+        error(parser, parser->current, compile_time_errors[CAN_USE_SET_DEFINE]);
 
         break;
       }
@@ -766,22 +777,26 @@ static void class(Parser* parser, bool force) {
       }
 
       if (match(parser, TOKEN_DEFINE) == true) {
-        Positions position;
+        do {
+          Positions position;
 
-        Token method = parser->current;
+          Token method = parser->current;
 
-        if (memcmp(method.start, class.start, method.length > class.length ? method.length : class.length) == 0)
-          position = POSITION_CONSTRUCTOR;
-        else position = POSITION_METHOD;
+          if (memcmp(method.start, class.start, method.length > class.length ? method.length : class.length) == 0)
+            position = POSITION_CONSTRUCTOR;
+          else position = POSITION_METHOD;
 
-        consume(parser, TOKEN_IDENTIFIER, compile_time_errors[EXPECT_METHOD_IDENTIFIER]);
+          consume(parser, TOKEN_IDENTIFIER, compile_time_errors[EXPECT_METHOD_IDENTIFIER]);
 
-        uint8_t constant = identify(parser, &parser->previous);
+          uint8_t constant = identify(parser, &parser->previous);
 
-        emit_function(parser, position, false);
+          emit_function(parser, position, false);
 
-        EMIT_BYTE(parser, OP_METHOD);
-        EMIT_BYTE(parser, constant);
+          EMIT_BYTE(parser, OP_METHOD);
+          EMIT_BYTE(parser, constant);
+        } while(match(parser, TOKEN_COMMA) == true);
+
+        consume(parser, TOKEN_SEMICOLON, compile_time_errors[EXPECT_SEMICOLON]);
       }
     }
 
@@ -789,6 +804,8 @@ static void class(Parser* parser, bool force) {
   }
 
   EMIT_BYTE(parser, OP_POP);
+
+  parser->entity = parser->entity->enclosing;
 }
 
 static void conditional(Parser* parser) {
@@ -1003,7 +1020,7 @@ static void instruction(Parser* parser) {
       check(parser, TOKEN_DEFINE) == false && 
       check(parser, TOKEN_CLASS) == false
     ) {
-      error(parser, parser->previous, compile_time_errors[EXPECT_SET_DEFINE_CLASS]);
+      error(parser, parser->previous, compile_time_errors[CAN_USE_SET_DEFINE_CLASS]);
       return;
     }
 
@@ -1048,6 +1065,7 @@ Function* compile(VM* vm, const char* source) {
 
   parser.vm = vm;
 
+  parser.entity = NULL;
   parser.compiler = NULL;
 
   parser.panic = false; parser.error = false;

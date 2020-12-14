@@ -30,7 +30,7 @@ const char* compile_time_errors[] = {
   [EXPECT_OPEN_FOR] = "Expect '(' before 'for' branch.",
   [EXPECT_CLOSE_FOR] = "Expect '(' after 'for' branch.",
   [TOO_MANY_CLOSURE_VARIABLES] = "Too many closure variables in Function.",
-  [EXPECT_SET_DEFINE_CLASS] = "Expect 'set', 'define' or 'class' statement after 'global' modifier.",
+  [CAN_USE_SET_DEFINE_CLASS] = "Expect 'set', 'define' or 'class' statement after 'global' modifier.",
   [EXPECT_CLASS_IDENTIFIER] = "Expect Class identifier.",
   [EXPECT_OPEN_CLASS] = "Expect '{' before Class body.",
   [EXPECT_CLOSE_CLASS] = "Expect '}' after Class body.",
@@ -40,7 +40,7 @@ const char* compile_time_errors[] = {
   [CANNOT_USE_THIS] = "Cannot use 'this' outiside of a class method.",
   [CANNOT_RETURN_CONSTRUCTOR] = "Cannot return a value from a constructor.",
   [EXPECT_COLON_TERNARY] = "Expect ':' in ternary operator.",
-  [EXPECT_SET_DEFINE] = "Expect 'set' or 'define' statement in Class definition."
+  [CAN_USE_SET_DEFINE] = "Expect 'set' or 'define' statement in Class definition."
 };
 
 const char* run_time_errors[] = {

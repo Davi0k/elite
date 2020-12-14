@@ -230,6 +230,21 @@ static void close(VM* vm, Value* last) {
   }
 }
 
+static bool bound(VM* vm, Table table, String* property) {
+  Value method;
+
+  if (table_get(&table, property, &method) == false)
+    return false;
+
+  Value receiver = pop(&vm->stack, 1);
+  Closure* closure = AS_CLOSURE(method);
+  Bound* bound = new_bound(vm, receiver, closure);
+
+  push(&vm->stack, OBJECT(bound));
+
+  return true;
+}
+
 static bool method(VM* vm, Class* class, String* identifier, int count) {
   Value method;
 
@@ -610,14 +625,14 @@ static Results run(VM* vm) {
 
       Value value = pop(&vm->stack, 1);
 
-      if (
-        table_set(&instance->fields, property, value) == false ||
-        table_set(&instance->class->methods, property, value) == false
-      ) {
+      if (table_set(&instance->fields, property, value) == false) {
         pop(&vm->stack, 1);
         push(&vm->stack, value);
         COMPUTE_NEXT();
       }
+
+      if (bound(vm, instance->class->methods, property) == true)
+        COMPUTE_NEXT();
 
       error(vm, run_time_errors[UNDEFINED_PROPERTY], property->content);
 
@@ -637,14 +652,14 @@ static Results run(VM* vm) {
 
       Value value;
 
-      if (
-        table_get(&instance->fields, property, &value) == true ||
-        table_get(&instance->class->methods, property, &value) == true
-      ) {
+      if (table_get(&instance->fields, property, &value) == true) {
         pop(&vm->stack, 1);
         push(&vm->stack, value);
         COMPUTE_NEXT();
       }
+
+      if (bound(vm, instance->class->methods, property) == true)
+        COMPUTE_NEXT();
 
       error(vm, run_time_errors[UNDEFINED_PROPERTY], property->content);
 
