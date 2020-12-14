@@ -1,0 +1,20 @@
+set result: 0; #Define a global variable
+
+#Use an infinite loop to allow more than one operation
+while true: {
+    print("Input two Numbers:");
+
+    #Get inputs and convert them using the specifics Native Functions
+    set x: number(input()), y: number(input()); 
+
+    print("Insert an operator (+, -, *, /):");
+    
+    set operator: input();
+
+    if operator == '+': result = x + y;
+    if operator == '-': result = x - y;
+    if operator == '*': result = x * y;
+    if operator == '/': result = x / y;
+
+    print("The result is: ", result); #Print the result
+}

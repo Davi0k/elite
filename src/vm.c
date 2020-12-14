@@ -702,6 +702,18 @@ static Results run(VM* vm) {
     COMPUTE_NEXT();
   }
 
+  OP_INHERIT: {
+    Class* superclass = AS_CLASS(peek(&vm->stack, 1));
+    Class* subclass = AS_CLASS(peek(&vm->stack, 0));
+
+    table_append(&superclass->members, &subclass->members);
+    table_append(&superclass->methods, &subclass->methods);
+
+    pop(&vm->stack, 1);
+
+    COMPUTE_NEXT();
+  }
+
   OP_EMPTY: COMPUTE_NEXT();
 
   OP_EXIT: return INTERPRET_OK;

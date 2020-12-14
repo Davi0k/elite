@@ -40,7 +40,9 @@ const char* compile_time_errors[] = {
   [CANNOT_USE_THIS] = "Cannot use 'this' outiside of a class method.",
   [CANNOT_RETURN_CONSTRUCTOR] = "Cannot return a value from a constructor.",
   [EXPECT_COLON_TERNARY] = "Expect ':' in ternary operator.",
-  [CAN_USE_SET_DEFINE] = "Expect 'set' or 'define' statement in Class definition."
+  [CAN_USE_SET_DEFINE] = "Expect 'set' or 'define' statement in Class definition.",
+  [EXPECT_SUPER_IDENTIFIER] = "Expect superclass identifier.",
+  [CANNOT_INHERIT_SELF] = "A Class cannot inherit from itself."
 };
 
 const char* run_time_errors[] = {

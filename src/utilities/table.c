@@ -121,7 +121,7 @@ void table_clear(Table* table) {
   }
 }
 
-void table_copy(Table* from, Table* to) {
+void table_append(Table* from, Table* to) {
   for (int i = 0; i < from->capacity; i++) {
     Entry* entry = &from->entries[i];
 

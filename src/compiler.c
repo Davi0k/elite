@@ -745,6 +745,19 @@ static void class(Parser* parser, bool force) {
 
   parser->entity = &entity;
 
+  if (match(parser, TOKEN_COLON) == true) {
+    consume(parser, TOKEN_IDENTIFIER, compile_time_errors[EXPECT_SUPER_IDENTIFIER]);
+
+    emit_variable(parser, parser->previous, false);
+
+    if (identifiers_equality(&parser->previous, &class) == true)
+      error(parser, parser->previous, compile_time_errors[CANNOT_INHERIT_SELF]);
+
+    emit_variable(parser, class, false);
+
+    EMIT_BYTE(parser, OP_INHERIT);
+  }
+
   emit_variable(parser, class, false);
 
   if (match(parser, TOKEN_SEMICOLON) == false) {

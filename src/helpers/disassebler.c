@@ -95,6 +95,7 @@ int disassemble_instruction(Chunk* chunk, int offset) {
     case OP_POP:
     case OP_POP_N:
     case OP_CLOSE:
+    case OP_INHERIT:
     case OP_RETURN:
     case OP_EXIT:
       return simple_representation(strings[instruction], offset);

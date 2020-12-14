@@ -1,0 +1,19 @@
+#Define a new class
+class Triangle {
+    set A: 0, B: 0, C: 0; #Add some class members
+
+    #Define a constructor to initialize instances of this class
+    define Triangle(A, B, C) {
+        this.A = A;
+        this.B = B;
+        this.C = C;
+    };
+
+    define check: this.A + this.B + this.C == 180;
+}
+
+set triangle: Triangle(30, 60, 90); #Create an instance of the class
+
+if triangle.check():
+    print("The Triangle is valid.");
+else: print("The Triangle is not valid.");

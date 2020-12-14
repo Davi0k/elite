@@ -152,6 +152,8 @@ if triangle.check():
 else: print("The Triangle is not valid.");
 ```
 
+**You will find more Demos in the specific examples folder.**
+
 ## License
 
 This project is released under the `MIT License`. You can find the original license source here: [https://opensource.org/licenses/MIT](https://opensource.org/licenses/MIT).

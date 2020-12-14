@@ -40,7 +40,7 @@ bool table_delete(Table* table, String* key);
 
 void table_clear(Table* table);
 
-void table_copy(Table* from, Table* to);
+void table_append(Table* from, Table* to);
 
 String* table_find_string(Table* table, const char* content, int length, uint32_t hash);
 

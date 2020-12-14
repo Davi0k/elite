@@ -140,7 +140,7 @@ Instance* new_instance(VM* vm, Class* class) {
 
   initialize_table(&instance->fields, vm);
 
-  table_copy(&class->members, &instance->fields);
+  table_append(&class->members, &instance->fields);
 
   return instance;
 }
