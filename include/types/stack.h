@@ -5,11 +5,14 @@
 
 #include "types/value.h"
 
+#define STACK_DEFAULT_SIZE 64 * 1024
+
 typedef struct Stack {
-  Value content[1024 * 64];
-  
+  Value content[STACK_DEFAULT_SIZE]; 
+
   Value* top;
 } Stack;
+
 
 void push(Stack* stack, Value value);
 

@@ -104,7 +104,6 @@ typedef struct Bound {
   Object object;
   Value receiver;
   Closure* method;
-  
 } Bound;
 
 Number* allocate_number_from_gmp(VM* vm, mpf_t value);

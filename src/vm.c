@@ -4,35 +4,28 @@
 #include <limits.h>
 
 #include "vm.h"
+#include "compiler.h"
 #include "types/object.h"
 #include "utilities/memory.h"
 
-#define FRAME_DEFAULT_SIZE 16
-
 #define DEFAULT_THRESHOLD 1024 * 64
 
+#define FRAME_INITIAL_CAPACITY 16
+
 void initialize_VM(VM* vm) {
-  vm->frames = NULL;
   vm->objects = NULL;
   vm->upvalues = NULL;
 
-  vm->allocate = 0;
-
   vm->threshold = DEFAULT_THRESHOLD;
-
-  vm->count = 0;
-  vm->capacity = FRAME_DEFAULT_SIZE;
-  vm->frames = ALLOCATE_ARRAY(vm, Frame, vm->frames, 0 , vm->capacity);
 
   vm->stack.top = vm->stack.content;
 
+  vm->call.count = 0;
+  vm->call.capacity = FRAME_INITIAL_CAPACITY;
+  vm->call.frames = ALLOCATE_ARRAY(vm, Frame, vm->call.frames, 0, vm->call.capacity);
+
   initialize_table(&vm->strings, vm);
   initialize_table(&vm->globals, vm);
-
-  native(vm, "stopwatch", stopwatch_native);
-  native(vm, "number", number_native);
-  native(vm, "print", print_native);
-  native(vm, "input", input_native);
 }
 
 void free_VM(VM* vm) {
@@ -44,10 +37,10 @@ void free_VM(VM* vm) {
     object = next;
   }
 
+  FREE_ARRAY(vm, Frame, vm->call.frames, vm->call.capacity);
+
   free_table(&vm->strings); 
   free_table(&vm->globals); 
-
-  FREE_ARRAY(vm, Frame, vm->frames, vm->capacity);
 }
 
 void native(VM* vm, const char* identifier, Internal internal) {
@@ -59,7 +52,14 @@ void native(VM* vm, const char* identifier, Internal internal) {
   pop(&vm->stack, 2);
 }
 
-static bool falsey(Value value) {
+static inline void load_default_natives(VM* vm) {
+  native(vm, "stopwatch", stopwatch_native);
+  native(vm, "number", number_native);
+  native(vm, "print", print_native);
+  native(vm, "input", input_native);
+}
+
+static inline bool falsey(Value value) {
   return IS_VOID(value) || 
          IS_UNDEFINED(value) || 
          (IS_BOOLEAN(value) && AS_BOOLEAN(value) == false);
@@ -78,8 +78,8 @@ static void error(VM* vm, const char* message, ...) {
 
   size_t error = 0, counter = 0;
 
-  for (int i = vm->count - 1; i >= 0; i--) {
-    Frame* frame = &vm->frames[i];
+  for (int i = vm->call.count - 1; i >= 0; i--) {
+    Frame* frame = &vm->call.frames[i];
 
     Function* function = frame->closure->function;
 
@@ -114,20 +114,20 @@ static bool invoke(VM* vm, Closure* closure, int count) {
     return false;
   }
 
-  if (vm->capacity < vm->count + 1) {
-    if (GROW_CAPACITY(vm->capacity) > INT32_MAX / (vm->capacity == 0 ? 1 : vm->capacity)) {
+  if (vm->call.capacity < vm->call.count + 1) {
+    if (GROW_CAPACITY(vm->call.capacity) > INT32_MAX / (vm->call.capacity == 0 ? 1 : vm->call.capacity)) {
       error(vm, run_time_errors[STACK_OVERFLOW]);
       return false;
     }
 
-    int capacity = vm->capacity;
+    int capacity = vm->call.capacity;
 
-    vm->capacity = GROW_CAPACITY(capacity);
+    vm->call.capacity = GROW_CAPACITY(capacity);
 
-    vm->frames = ALLOCATE_ARRAY(vm, Frame, vm->frames, capacity, vm->capacity);
+    vm->call.frames = ALLOCATE_ARRAY(vm, Frame, vm->call.frames, capacity, vm->call.capacity);
   }
 
-  Frame* frame = &vm->frames[vm->count++];
+  Frame* frame = &vm->call.frames[vm->call.count++];
   frame->closure = closure;
   frame->ip = closure->function->chunk.code;
 
@@ -258,7 +258,7 @@ static bool method(VM* vm, Class* class, String* identifier, int count) {
 }
 
 static Results run(VM* vm) {
-  Frame* frame = &vm->frames[vm->count - 1];
+  Frame* frame = &vm->call.frames[vm->call.count - 1];
 
   #define READ_BYTE() ( *frame->ip++ )
 
@@ -540,7 +540,7 @@ static Results run(VM* vm) {
     if (call(vm, value, count) == false)
       return INTERPRET_RUNTIME_ERROR;
 
-    frame = &vm->frames[vm->count - 1];
+    frame = &vm->call.frames[vm->call.count - 1];
 
     COMPUTE_NEXT();
   }
@@ -550,9 +550,9 @@ static Results run(VM* vm) {
 
     close(vm, frame->slots);
 
-    vm->count--;
+    vm->call.count--;
 
-    if (vm->count == 0) {
+    if (vm->call.count == 0) {
       pop(&vm->stack, 1);
       return INTERPRET_OK;
     }
@@ -561,7 +561,7 @@ static Results run(VM* vm) {
 
     push(&vm->stack, result);
 
-    frame = &vm->frames[vm->count - 1];
+    frame = &vm->call.frames[vm->call.count - 1];
 
     COMPUTE_NEXT();
   }
@@ -697,7 +697,7 @@ static Results run(VM* vm) {
     if (method(vm, instance->class, identifier, count) == false)
       return INTERPRET_RUNTIME_ERROR;
 
-    frame = &vm->frames[vm->count - 1];
+    frame = &vm->call.frames[vm->call.count - 1];
 
     COMPUTE_NEXT();
   }
@@ -740,6 +740,10 @@ static Results run(VM* vm) {
 }
 
 Results interpret(VM* vm, const char* source) {
+  mpf_set_default_prec(GMP_MAX_PRECISION);
+
+  load_default_natives(vm);
+
   Function* function = compile(vm, source);
 
   if (function == NULL) return INTERPRET_COMPILE_ERROR;

@@ -5,7 +5,6 @@
 
 #include "common.h"
 
-#include "compiler.h"
 #include "utilities/chunk.h"
 #include "utilities/table.h"
 #include "utilities/native.h"
@@ -24,12 +23,16 @@ typedef struct {
   Value* slots;
 } Frame;
 
-typedef struct VM {
+typedef struct {
   Frame* frames;
   int capacity;
   int count;
+} Call;
 
+typedef struct VM {
   size_t allocate, threshold;
+
+  Call call;
 
   Stack stack;
 

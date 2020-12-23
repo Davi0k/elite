@@ -23,8 +23,8 @@
 #define FREE(vm, type, pointer) \
   reallocate(vm, pointer, sizeof(type), 0)
 
-#define FREE_ARRAY(vm, type, pointer, old) \
-  reallocate( vm, pointer, sizeof(type) * (old), 0 )
+#define FREE_ARRAY(vm, type, pointer, capacity) \
+  reallocate( vm, pointer, sizeof(type) * (capacity), 0 )
 
 typedef struct {
   int count;

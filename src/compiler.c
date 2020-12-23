@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "vm.h"
 #include "compiler.h"
 #include "tokenizer.h"
 #include "types/object.h"
@@ -269,7 +270,7 @@ static void local(Parser* parser, Token identifier) {
   local->captured = false;
 }
 
-static int resolve(Parser* parser, Compiler* compiler, Token* identifier) {
+static int resolve_local(Parser* parser, Compiler* compiler, Token* identifier) {
   for (int i = compiler->count - 1; i >= 0; i--) {
     Local* local = &compiler->locals[i];
     
@@ -284,7 +285,7 @@ static int resolve(Parser* parser, Compiler* compiler, Token* identifier) {
   return INITIALIZE;
 }
 
-static int up(Parser* parser, Compiler* compiler, uint8_t index, bool local) {
+static int upvalue(Parser* parser, Compiler* compiler, uint8_t index, bool local) {
   int count = compiler->function->count;
 
   for (int i = 0; i < count; i++) {
@@ -305,21 +306,21 @@ static int up(Parser* parser, Compiler* compiler, uint8_t index, bool local) {
   return compiler->function->count++;
 }
 
-static int upvalue(Parser* parser, Compiler* compiler, Token* identifier) {
+static int resolve_upvalue(Parser* parser, Compiler* compiler, Token* identifier) {
   if (compiler->enclosing == NULL) return INITIALIZE;
 
-  int local = resolve(parser, compiler->enclosing, identifier);
+  int local = resolve_local(parser, compiler->enclosing, identifier);
 
   if (local != INITIALIZE) {
     compiler->enclosing->locals[local].captured = true;
 
-    return up(parser, compiler, (uint8_t)local, true);
+    return upvalue(parser, compiler, (uint8_t)local, true);
   }
 
-  int over = upvalue(parser, compiler->enclosing, identifier);
+  int over = resolve_upvalue(parser, compiler->enclosing, identifier);
 
   if (over != INITIALIZE)
-    return up(parser, compiler, (uint8_t)over, false);
+    return upvalue(parser, compiler, (uint8_t)over, false);
 
   return INITIALIZE;
 }
@@ -365,7 +366,7 @@ static uint8_t definition(Parser* parser, const char* error, bool force) {
   else return 0;
 }
 
-static void close_scope(Parser* parser) {
+static void exit_scope(Parser* parser) {
   parser->compiler->scope--;
 
   Compiler* compiler = parser->compiler;
@@ -412,13 +413,13 @@ static uint8_t arguments(Parser* parser) {
 static void emit_variable(Parser* parser, Token identifier, bool assign) {
   uint8_t setter = 0, getter = 0;
 
-  int argument = resolve(parser, parser->compiler, &identifier);
+  int argument = resolve_local(parser, parser->compiler, &identifier);
 
   if (argument >= 0) {
     setter = OP_LOCAL_SET;
     getter = OP_LOCAL_GET;
   } else {
-    argument = upvalue(parser, parser->compiler, &identifier);
+    argument = resolve_upvalue(parser, parser->compiler, &identifier);
 
     if(argument != INITIALIZE) {
       setter = OP_UP_SET;
@@ -853,7 +854,7 @@ static void class(Parser* parser, bool force) {
   EMIT_BYTE(parser, OP_POP);
 
   if (parser->entity->inheritance == true)
-    close_scope(parser);
+    exit_scope(parser);
 
   parser->entity = parser->entity->enclosing;
 }
@@ -979,7 +980,7 @@ static void looping(Parser* parser) {
     EMIT_BYTE(parser, OP_POP);
   }
 
-  close_scope(parser);
+  exit_scope(parser);
 }
 
 static void synchronize(Parser* parser) {
@@ -1009,8 +1010,12 @@ static void expression(Parser* parser) {
 }
 
 static void block(Parser* parser) {
-  while (check(parser, TOKEN_CLOSE_BRACES) == false && check(parser, TOKEN_EOF) == false) 
+  while (check(parser, TOKEN_CLOSE_BRACES) == false) {
+    if (check(parser, TOKEN_EOF) == true)
+      break;
+
     instruction(parser);
+  }
 
   consume(parser, TOKEN_CLOSE_BRACES, compile_time_errors[EXPECT_BLOCK]);
 }
@@ -1021,7 +1026,7 @@ static void statement(Parser* parser) {
   if (match(parser, TOKEN_OPEN_BRACES)) {
     parser->compiler->scope++;;
     block(parser);
-    close_scope(parser);
+    exit_scope(parser);
   } 
   else if (match(parser, TOKEN_IF)) 
     conditional(parser);

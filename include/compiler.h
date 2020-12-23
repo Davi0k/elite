@@ -62,7 +62,7 @@ typedef struct Compiler {
   Up ups[MAXIMUM_LIMIT];
 } Compiler;
 
-typedef struct {
+typedef struct Parser {
   bool panic, error;
 
   Tokenizer tokenizer;

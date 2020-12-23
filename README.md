@@ -64,11 +64,48 @@ The interpreter depends on some libraries and tools, make sure you have installe
 
 * The `Make` tool, used to compile the interpreter if you have used the `Unix Makefile` generator with `CMake`. Otherwise, you have to use the right tool depending on which generator you have used: [https://www.gnu.org/software/make/](https://www.gnu.org/software/make/)
 
+## Building the Docker image
+Inside the `Repository`, there is everything necessary to create a `Docker` image that allows the interpreter to work without the user having to install all the necessary requirements and manually compile the source code of the project.
+
+Once you have cloned this `Repository`, go inside it and build the image using the `Dockerfile` contained in the project. If you want you can give it a name:
+```
+docker build -t davi0k/elite .
+```
+
+Next, make sure the build was successful. If everything is correct, this command should show the image you just created:
+```
+docker images
+```
+
+Then, check that the image works correctly:
+```
+docker run -it --rm davi0k/elite -v
+```
+This command starts a new interactive `Container` and that will be deleted and cleaned after its execution. It should return the installed version of the interpreter.
+
+You can also directly run the demos contained in the examples directory:
+```
+docker run -it --rm davi0k/elite examples/calculator.eli
+docker run -it --rm davi0k/elite examples/complex.eli
+docker run -it --rm davi0k/elite examples/triangle.eli
+```
+
+If you want, you can run any of your scripts through the image you just built. To do this, you need to mount the folder or the file you want to use in the container that you are going to start:
+```
+docker run -it --rm --mount src=$(pwd),target=/usr/src/elite/,type=bind davi0k/elite script.eli
+```
+Or:
+```
+docker run -it --rm --mount src="%cd%",target=/usr/src/elite/,type=bind davi0k/elite script.eli
+```
+These commands will serve the container every file and folder contained in the current directory.
+
 ## Using the CLI
 To run a script, use the following dedicated Command-Line Interface (**CLI**) syntax:
 ```
-.\elite.exe [path] [-v]
+.\elite.exe [path] [-v] [-h]
 ```
+If you want, you can use the `REPL` (Read Eval Print Loop) by running the **CLI** without any positional parameters.
 
 ## Example scripts
 A simple Arithmetic Calculator made using some Control-Flow statements.

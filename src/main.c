@@ -6,10 +6,20 @@
 
 #include "vm.h"
 
-#define VERSION "1.0.0"
+#define VERSION \
+  "Elite 1.0.0" \
+  "\nRepository: https://github.com/Davi0k/elite" \
+  "\nAbout me: https://davide.codes"
+
+#define HELP \
+  "Usage: elite [path] [-v] [-h]" \
+  "\n\tpath: The path of the script you want to execute." \
+  "\nOptions:" \
+  "\n\t-v: Returns the current interpreter's version." \
+  "\n\t-h: Returns a list of the available settings and options for the interpreter."
 
 static void file(VM* vm, const char* path) {
-  int code;
+  int code = 0;
 
   char* source = read(path, &code);
 
@@ -38,8 +48,6 @@ static void file(VM* vm, const char* path) {
 }
 
 int main(int argc, const char* argv[]) {
-  mpf_set_default_prec(GMP_MAX_PRECISION);
-
   VM vm;
 
   initialize_VM(&vm);
@@ -50,15 +58,21 @@ int main(int argc, const char* argv[]) {
     if (parameter[0] == '-') {
       switch (parameter[1]) {
         case 'v':
-          printf("Elite %s", VERSION);
+        case 'V':
+          printf(VERSION);
+          break;
+
+        case 'h':
+        case 'H': 
+          printf(HELP);
           break;
       }
     }
     else file(&vm, argv[1]);
   }
 
-  if (argc != 1 && argc != 2) {
-    fprintf(stderr, "The correct syntax is: elite [path] [-v]");
+  if (argc != 2) {
+    fprintf(stderr, "The correct syntax is: elite [path] [-v] [-h]");
     exit(64);
   }
 

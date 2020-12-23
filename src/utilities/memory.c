@@ -46,8 +46,8 @@ void roots(VM* vm, Parents* parents) {
   for (Upvalue* upvalue = vm->upvalues; upvalue != NULL; upvalue = upvalue->next)
     mark(parents, OBJECT(upvalue));
 
-  for (int i = 0; i < vm->count; i++)
-    mark(parents, OBJECT(vm->frames[i].closure));
+  for (int i = 0; i < vm->call.count; i++)
+    mark(parents, OBJECT(vm->call.frames[i].closure));
 
   Table* table = &vm->globals;
 
