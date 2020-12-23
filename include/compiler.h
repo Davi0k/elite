@@ -44,7 +44,7 @@ typedef struct {
 
 typedef struct Entity {
   struct Entity* enclosing;
-  Token name;
+  Token identifier;
   bool inheritance;
 } Entity;
 

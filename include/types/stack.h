@@ -13,7 +13,7 @@ typedef struct Stack {
 
 void push(Stack* stack, Value value);
 
-Value pop(Stack* stack, int distance);
+Value pop(Stack* stack, int count);
 
 Value peek(Stack* stack, int distance);
 

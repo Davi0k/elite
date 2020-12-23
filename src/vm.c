@@ -714,6 +714,19 @@ static Results run(VM* vm) {
     COMPUTE_NEXT();
   }
 
+  OP_SUPER: {
+    String* identifier = AS_STRING(READ_CONSTANT());
+
+    Class* superclass = AS_CLASS(pop(&vm->stack, 1));
+
+    if (bound(vm, superclass->methods, identifier) == true)
+      COMPUTE_NEXT();
+
+    error(vm, run_time_errors[UNDEFINED_PROPERTY], identifier->content);
+
+    return INTERPRET_RUNTIME_ERROR;
+  }
+
   OP_EMPTY: COMPUTE_NEXT();
 
   OP_EXIT: return INTERPRET_OK;

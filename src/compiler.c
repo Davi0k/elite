@@ -77,6 +77,7 @@ static void call(Parser* parser, bool assign);
 static void accessor(Parser* parser, bool assign);
 
 static void this(Parser* parser, bool assign);
+static void super(Parser* parser, bool assign);
 
 static void expression(Parser* parser);
 static void block(Parser* parser);
@@ -154,7 +155,7 @@ Rule rules[] = {
   [ TOKEN_CLASS ] = { NULL, NULL, PRECEDENCE_NONE },
   [ TOKEN_THIS ] = { this, NULL, PRECEDENCE_NONE },
   [ TOKEN_STATIC ] = { NULL, NULL, PRECEDENCE_NONE },
-  [ TOKEN_SUPER ] = { NULL, NULL, PRECEDENCE_NONE },
+  [ TOKEN_SUPER ] = { super, NULL, PRECEDENCE_NONE },
 
   [ TOKEN_SEMICOLON ] = { NULL, NULL, PRECEDENCE_NONE}
 };
@@ -215,6 +216,15 @@ static void consume(Parser* parser, Types type, const char* message) {
     return advance(parser);
 
   error(parser, parser->previous, message);
+}
+
+static Token synthetic(const char* text) {
+  Token token;
+
+  token.start = text;
+  token.length = (int)strlen(text);
+
+  return token;
 }
 
 static uint8_t make(Parser* parser, Value value) {
@@ -693,9 +703,27 @@ static void accessor(Parser* parser, bool assign) {
 }
 
 static void this(Parser* parser, bool assign) {
-  if (parser->compiler->position == POSITION_METHOD || parser->compiler->position == POSITION_CONSTRUCTOR)
-    emit_variable(parser, parser->previous, false);
-  else error(parser, parser->previous, compile_time_errors[CANNOT_USE_THIS]);
+  if (parser->entity == NULL)
+    error(parser, parser->previous, compile_time_errors[CANNOT_USE_THIS]);
+  else emit_variable(parser, parser->previous, false);
+}
+
+static void super(Parser* parser, bool assign) {
+  if (parser->entity == NULL)
+    error(parser, parser->previous, compile_time_errors[CANNOT_USE_SUPER]);
+  else if (parser->entity->inheritance == false)
+    error(parser, parser->previous, compile_time_errors[MUST_HAVE_SUPERCLASS]);
+
+  consume(parser, TOKEN_DOT, compile_time_errors[EXPECT_DOT_AFTER_SUPER]);
+  consume(parser, TOKEN_IDENTIFIER, compile_time_errors[EXPECT_SUPERCLASS_PROPERTY]);
+  
+  uint8_t identifier = identify(parser, &parser->previous);
+
+  emit_variable(parser, synthetic("this"), false);
+  emit_variable(parser, synthetic("super"), false);
+
+  EMIT_BYTE(parser, OP_SUPER);
+  EMIT_BYTE(parser, identifier);
 }
 
 static void set(Parser* parser, bool force) {
@@ -740,8 +768,8 @@ static void class(Parser* parser, bool force) {
   Entity entity;
 
   entity.enclosing = parser->entity;
-  entity.name = parser->previous;
-  entity.inheritance = false;
+  entity.identifier = parser->previous;
+  entity.inheritance = check(parser, TOKEN_COLON);
 
   parser->entity = &entity;
 
@@ -752,6 +780,12 @@ static void class(Parser* parser, bool force) {
 
     if (identifiers_equality(&parser->previous, &class) == true)
       error(parser, parser->previous, compile_time_errors[CANNOT_INHERIT_SELF]);
+
+    Token token = synthetic("super");
+
+    parser->compiler->scope++;
+    local(parser, token);
+    initialize(parser, 0, false);
 
     emit_variable(parser, class, false);
 
@@ -767,7 +801,7 @@ static void class(Parser* parser, bool force) {
       if (check(parser, TOKEN_EOF) == true) break;
 
       if (check(parser, TOKEN_SET) == false && check(parser, TOKEN_DEFINE) == false) {
-        error(parser, parser->current, compile_time_errors[CAN_USE_SET_DEFINE]);
+        error(parser, parser->current, compile_time_errors[CLASS_CAN_SET_DEFINE]);
 
         break;
       }
@@ -817,6 +851,9 @@ static void class(Parser* parser, bool force) {
   }
 
   EMIT_BYTE(parser, OP_POP);
+
+  if (parser->entity->inheritance == true)
+    close_scope(parser);
 
   parser->entity = parser->entity->enclosing;
 }
@@ -1033,7 +1070,7 @@ static void instruction(Parser* parser) {
       check(parser, TOKEN_DEFINE) == false && 
       check(parser, TOKEN_CLASS) == false
     ) {
-      error(parser, parser->previous, compile_time_errors[CAN_USE_SET_DEFINE_CLASS]);
+      error(parser, parser->previous, compile_time_errors[GLOBAL_CAN_SET_DEFINE_CLASS]);
       return;
     }
 
