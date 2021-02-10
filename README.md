@@ -103,7 +103,7 @@ If you want, you can run any of your scripts through the image you just built. T
 docker run -it --rm --mount src=$(pwd),target=/usr/src/elite/,type=bind davi0k/elite script.eli
 ```
 
-These commands will serve the container every file and folder contained in the current directory.
+These command will serve the container every file and folder contained in the current directory.
 
 ## Using the CLI
 To run a script, use the following dedicated Command-Line Interface (**CLI**) syntax:
@@ -194,7 +194,7 @@ if triangle.check():
 else: print("The Triangle is not valid.");
 ```
 
-**You will find more Demos in the specific examples folder.**
+**You will find more Demos in the examples and benchmarks folders.**
 
 ## License
 

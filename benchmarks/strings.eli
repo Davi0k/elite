@@ -1,0 +1,25 @@
+set A: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+set B: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+set C: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
+set D: "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
+set E: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+set F: "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
+set G: "gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg";
+set H: "hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh";
+
+set start: stopwatch();
+
+for (set i: 0; i < 1000000; i++) {
+    A; A; A; B; A; C; A; D; A; E; A; F; A; G; A; H;
+    B; A; B; B; B; C; B; D; B; E; B; F; B; G; B; H;
+    C; A; C; B; C; C; C; D; C; E; C; F; C; G; C; H;
+    D; A; D; B; D; C; D; D; D; E; D; F; D; G; D; H;
+    E; A; E; B; E; C; E; D; E; E; E; F; E; G; E; H;
+    F; A; F; B; F; C; F; D; F; E; F; F; F; G; F; H;
+    G; A; G; B; G; C; G; D; G; E; G; F; G; G; G; H;
+    H; A; H; B; H; C; H; D; H; E; H; F; H; G; H; H;
+}
+
+set stop: stopwatch();
+
+print("Execution Time: ", stop - start);

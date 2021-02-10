@@ -1,0 +1,79 @@
+class Test {
+    set field_01: 1, field_02: 2, field_03: 3, field_04: 4, field_05: 5, field_06: 6, 
+        field_07: 7, field_08: 8, field_09: 9, field_10: 10, field_11: 11, field_12: 12, 
+        field_13: 13, field_14: 14, field_15: 15, field_16: 16, field_17: 17, field_18: 18, 
+        field_19: 19, field_20: 20, field_21: 21, field_22: 22, field_23: 23, field_24: 24, 
+        field_25: 25, field_26: 26, field_27: 27, field_28: 28, field_29: 29, field_30: 30; 
+
+    define method_01: this.field_01;
+    define method_02: this.field_02;
+    define method_03: this.field_03;
+    define method_04: this.field_04;
+    define method_05: this.field_05;
+    define method_06: this.field_06;
+    define method_07: this.field_07;
+    define method_08: this.field_08;
+    define method_09: this.field_09;
+    define method_10: this.field_10;
+    define method_11: this.field_11;
+    define method_12: this.field_12;
+    define method_13: this.field_13;
+    define method_14: this.field_14;
+    define method_15: this.field_15;
+    define method_16: this.field_16;
+    define method_17: this.field_17;
+    define method_18: this.field_18;
+    define method_19: this.field_19;
+    define method_20: this.field_20;
+    define method_21: this.field_21;
+    define method_22: this.field_22;
+    define method_23: this.field_23;
+    define method_24: this.field_24;
+    define method_25: this.field_25;
+    define method_26: this.field_26;
+    define method_27: this.field_27;
+    define method_28: this.field_28;
+    define method_29: this.field_29;
+    define method_30: this.field_30;
+}
+
+set test: Test();
+
+set start: stopwatch();
+
+for (set i: 0; i < 500000; i++) {
+    test.method_01();
+    test.method_02();
+    test.method_03();
+    test.method_04();
+    test.method_05();
+    test.method_06();
+    test.method_07();
+    test.method_08();
+    test.method_09();
+    test.method_10();
+    test.method_11();
+    test.method_12();
+    test.method_13();
+    test.method_14();
+    test.method_15();
+    test.method_16();
+    test.method_17();
+    test.method_18();
+    test.method_19();
+    test.method_20();
+    test.method_21();
+    test.method_22();
+    test.method_23();
+    test.method_24();
+    test.method_25();
+    test.method_26();
+    test.method_27();
+    test.method_28();
+    test.method_29();
+    test.method_30();
+}
+
+set stop: stopwatch();
+
+print("Execution Time: ", stop - start);

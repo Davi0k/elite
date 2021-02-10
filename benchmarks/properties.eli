@@ -1,0 +1,32 @@
+class Fruits {
+    set apple: 0, tangerine: 1, 
+        lemon: 2, pear: 3, 
+        plum: 4, kiwi: 5;
+
+    define red: this.apple;
+    define orange: this.tangerine;
+    define yellow: this.lemon;
+    define green: this.pear;
+    define purple: this.plum;
+    define brown: this.kiwi;
+}
+
+set fruits: Fruits();
+
+set start: stopwatch();
+
+set sum: 0;
+
+while sum < 10000000: {
+    sum = sum 
+        + fruits.red()
+        + fruits.orange()
+        + fruits.yellow()
+        + fruits.green()
+        + fruits.purple()
+        + fruits.brown();
+}
+
+set stop: stopwatch();
+
+print("Execution Time: ", stop - start);

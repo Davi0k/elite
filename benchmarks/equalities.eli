@@ -1,0 +1,14 @@
+set start: stopwatch();
+
+for (set i: 0; i < 5000000; i++) {
+    1 == 1; 1 == 2; 1 == void; 1 == "str"; 1 == true; 1 == undefined;
+    void == void; void == 1; void == "str"; void == true; void == undefined;
+    undefined == undefined; undefined == 1; undefined == "str"; undefined == true; undefined == void;
+    true == true; true == 1; true == false; true == "str"; true == void; true == undefined;
+    false == false; false == 1; false == true; false == "str"; false == void; false == undefined;
+    "str" == "str"; "str" == "stru"; "str" == 1; "str" == void; "str" == true; "str" == undefined;
+}
+
+set stop: stopwatch();
+
+print("Execution time: ", stop - start);

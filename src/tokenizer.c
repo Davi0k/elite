@@ -188,7 +188,7 @@ static Types trie(Tokenizer* tokenizer) {
 }
 
 static Token identifier(Tokenizer* tokenizer) {
-  while (alpha(*tokenizer->current))
+  while (alpha(*tokenizer->current) || digit(*tokenizer->current))
     advance(tokenizer);
 
   Types type = trie(tokenizer);

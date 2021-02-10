@@ -1,0 +1,16 @@
+class Test;
+
+set start: stopwatch();
+
+for (set i: 0; i < 500000; i++) {
+    Test(); Test(); Test(); Test(); Test();
+    Test(); Test(); Test(); Test(); Test();
+    Test(); Test(); Test(); Test(); Test();
+    Test(); Test(); Test(); Test(); Test();
+    Test(); Test(); Test(); Test(); Test();
+    Test(); Test(); Test(); Test(); Test();
+}
+
+set stop: stopwatch();
+
+print("Execution Time: ", stop - start);
