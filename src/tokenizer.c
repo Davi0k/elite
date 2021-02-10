@@ -28,7 +28,6 @@ static Token error(Tokenizer* tokenizer, const char* message) {
 
   token.start = message;
   token.length = (int)strlen(message);
-
   token.line = tokenizer->line;
 
   return token;

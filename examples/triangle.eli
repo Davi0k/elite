@@ -7,7 +7,7 @@ class Triangle {
         this.A = A;
         this.B = B;
         this.C = C;
-    };
+    }
 
     define check: this.A + this.B + this.C == 180;
 }

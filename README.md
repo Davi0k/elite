@@ -51,14 +51,22 @@ If the output correctly shows a version of the software, it means that the insta
 
 ## Requirements
 
-The interpreter depends on some libraries and tools, make sure you have installed them correctly before trying to build the project.
+The interpreter depends on some libraries, extensions and tools, make sure you have installed them correctly before trying to build the project.
 
 #### Libraries
 
 * The **GNU**  `Multiple Precision Arithmetic` (GMP) Library: [https://gmplib.org/](https://gmplib.org/)
 
+#### Extensions
+
+* The `Statement Exprs` extension: [https://gcc.gnu.org/onlinedocs/gcc/Statement-Exprs.html#Statement-Exprs](https://gcc.gnu.org/onlinedocs/gcc/Statement-Exprs.html#Statement-Exprs)
+
+* The `Nested Functions` extension: [https://gcc.gnu.org/onlinedocs/gcc/Nested-Functions.html#Nested-Functions](https://gcc.gnu.org/onlinedocs/gcc/Nested-Functions.html#Nested-Functions)
+
+* The `Labels as Values` extension: [https://gcc.gnu.org/onlinedocs/gcc/Labels-as-Values.html#Labels-as-Values](https://gcc.gnu.org/onlinedocs/gcc/Labels-as-Values.html#Labels-as-Values)
+
 #### Tools
-* The `gcc` (**GNU** Compiler Collection) program or any other C compiler: [https://gcc.gnu.org/](https://gcc.gnu.org/)
+* The `gcc` (**GNU** Compiler Collection) program or any other C compiler supporting the required extensions: [https://gcc.gnu.org/](https://gcc.gnu.org/)
 
 * The `CMake` tool, used to execute the CMakeLists.txt file and create the necessary to compile the project: [https://cmake.org/](https://cmake.org/)
 
@@ -94,10 +102,7 @@ If you want, you can run any of your scripts through the image you just built. T
 ```
 docker run -it --rm --mount src=$(pwd),target=/usr/src/elite/,type=bind davi0k/elite script.eli
 ```
-Or:
-```
-docker run -it --rm --mount src="%cd%",target=/usr/src/elite/,type=bind davi0k/elite script.eli
-```
+
 These commands will serve the container every file and folder contained in the current directory.
 
 ## Using the CLI
@@ -142,23 +147,23 @@ define fibonacci(n) {
 	    return n;
     
     return fibonacci(n - 1) + fibonacci(n - 2);
-};
+}
 
 #Defining a recursive function to calculate the factorial
 define factorial(n) {
     if n > 0: 
 	    return n * factorial(n - 1);
     else: return 1;
-};
+}
 
 set start, stop; #Define some global variables
 
-start = stopwatch();
-
 set number: 25;
 
-print("The corresponding fibonacci number is ", fibonacci(number));
-print("The factorial is ", factorial(number));
+start = stopwatch();
+
+print("The corresponding fibonacci number is: ", fibonacci(number));
+print("The corresponding factorial number is: ", factorial(number));
 
 stop = stopwatch();
 
@@ -177,7 +182,7 @@ class Triangle {
         this.A = A;
         this.B = B;
         this.C = C;
-    };
+    }
 
     define check: this.A + this.B + this.C == 180;
 }

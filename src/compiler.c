@@ -70,7 +70,8 @@ static void or(Parser* parser, bool assign);
 
 static void ternary(Parser* parser, bool assign);
 
-static void variable(Parser* parser, bool assign);
+static void assignment(Parser* parser, bool assign);
+
 static void function(Parser* parser, bool assign);
 
 static void call(Parser* parser, bool assign);
@@ -95,7 +96,7 @@ Rule rules[] = {
   [ TOKEN_EMPTY ] = { NULL, NULL, PRECEDENCE_NONE },
   [ TOKEN_EXIT ] = { NULL, NULL, PRECEDENCE_NONE },
 
-  [ TOKEN_IDENTIFIER ] = { variable, NULL, PRECEDENCE_NONE },
+  [ TOKEN_IDENTIFIER ] = { assignment, NULL, PRECEDENCE_NONE },
   [ TOKEN_NUMBER ] = { number, NULL, PRECEDENCE_NONE },
   [ TOKEN_STRING ] = { string, NULL, PRECEDENCE_NONE },
   [ TOKEN_VOID ] = { literal, NULL, PRECEDENCE_NONE },
@@ -410,7 +411,7 @@ static uint8_t arguments(Parser* parser) {
   return count;
 }
 
-static void emit_variable(Parser* parser, Token identifier, bool assign) {
+static void emit_assignment(Parser* parser, Token identifier, bool assign) {
   uint8_t setter = 0, getter = 0;
 
   int argument = resolve_local(parser, parser->compiler, &identifier);
@@ -490,6 +491,7 @@ static void emit_function(Parser* parser, Positions position, bool assign) {
   else {
     expression(parser);
     EMIT_BYTE(parser, OP_RETURN);
+    consume(parser, TOKEN_SEMICOLON, compile_time_errors[EXPECT_SEMICOLON]);
   }
 
   Function* function = terminate(parser);
@@ -664,8 +666,8 @@ static void ternary(Parser* parser, bool assign) {
   patch(parser, otherwise);
 }
 
-static void variable(Parser* parser, bool assign) {
-  emit_variable(parser, parser->previous, assign);
+static void assignment(Parser* parser, bool assign) {
+  emit_assignment(parser, parser->previous, assign);
 }
 
 static void function(Parser* parser, bool assign) {
@@ -706,7 +708,7 @@ static void accessor(Parser* parser, bool assign) {
 static void this(Parser* parser, bool assign) {
   if (parser->entity == NULL)
     error(parser, parser->previous, compile_time_errors[CANNOT_USE_THIS]);
-  else emit_variable(parser, parser->previous, false);
+  else emit_assignment(parser, parser->previous, false);
 }
 
 static void super(Parser* parser, bool assign) {
@@ -720,8 +722,8 @@ static void super(Parser* parser, bool assign) {
   
   uint8_t identifier = identify(parser, &parser->previous);
 
-  emit_variable(parser, synthetic("this"), false);
-  emit_variable(parser, synthetic("super"), false);
+  emit_assignment(parser, synthetic("this"), false);
+  emit_assignment(parser, synthetic("super"), false);
 
   EMIT_BYTE(parser, OP_SUPER);
   EMIT_BYTE(parser, identifier);
@@ -742,14 +744,10 @@ static void set(Parser* parser, bool force) {
 }
 
 static void define(Parser* parser, bool force) {
-  do {
-    uint8_t global = definition(parser, compile_time_errors[EXPECT_FUNCTION_IDENTIFIER], force);
-    mark(parser, force);
-    emit_function(parser, POSITION_FUNCTION, false);
-    initialize(parser, global, force);
-  } while(match(parser, TOKEN_COMMA) == true);
-
-  consume(parser, TOKEN_SEMICOLON, compile_time_errors[EXPECT_SEMICOLON]);
+  uint8_t global = definition(parser, compile_time_errors[EXPECT_FUNCTION_IDENTIFIER], force);
+  mark(parser, force);
+  emit_function(parser, POSITION_FUNCTION, false);
+  initialize(parser, global, force);
 }
 
 static void class(Parser* parser, bool force) {
@@ -777,7 +775,7 @@ static void class(Parser* parser, bool force) {
   if (match(parser, TOKEN_COLON) == true) {
     consume(parser, TOKEN_IDENTIFIER, compile_time_errors[EXPECT_SUPER_IDENTIFIER]);
 
-    emit_variable(parser, parser->previous, false);
+    emit_assignment(parser, parser->previous, false);
 
     if (identifiers_equality(&parser->previous, &class) == true)
       error(parser, parser->previous, compile_time_errors[CANNOT_INHERIT_SELF]);
@@ -788,12 +786,12 @@ static void class(Parser* parser, bool force) {
     local(parser, token);
     initialize(parser, 0, false);
 
-    emit_variable(parser, class, false);
+    emit_assignment(parser, class, false);
 
     EMIT_BYTE(parser, OP_INHERIT);
   }
 
-  emit_variable(parser, class, false);
+  emit_assignment(parser, class, false);
 
   if (match(parser, TOKEN_SEMICOLON) == false) {
     consume(parser, TOKEN_OPEN_BRACES, compile_time_errors[EXPECT_OPEN_CLASS]);
@@ -825,26 +823,22 @@ static void class(Parser* parser, bool force) {
       }
 
       if (match(parser, TOKEN_DEFINE) == true) {
-        do {
-          Positions position;
+        Positions position;
 
-          Token method = parser->current;
+        Token method = parser->current;
 
-          if (memcmp(method.start, class.start, method.length > class.length ? method.length : class.length) == 0)
-            position = POSITION_CONSTRUCTOR;
-          else position = POSITION_METHOD;
+        if (memcmp(method.start, class.start, method.length > class.length ? method.length : class.length) == 0)
+          position = POSITION_CONSTRUCTOR;
+        else position = POSITION_METHOD;
 
-          consume(parser, TOKEN_IDENTIFIER, compile_time_errors[EXPECT_METHOD_IDENTIFIER]);
+        consume(parser, TOKEN_IDENTIFIER, compile_time_errors[EXPECT_METHOD_IDENTIFIER]);
 
-          uint8_t constant = identify(parser, &parser->previous);
+        uint8_t constant = identify(parser, &parser->previous);
 
-          emit_function(parser, position, false);
+        emit_function(parser, position, false);
 
-          EMIT_BYTE(parser, OP_METHOD);
-          EMIT_BYTE(parser, constant);
-        } while(match(parser, TOKEN_COMMA) == true);
-
-        consume(parser, TOKEN_SEMICOLON, compile_time_errors[EXPECT_SEMICOLON]);
+        EMIT_BYTE(parser, OP_METHOD);
+        EMIT_BYTE(parser, constant);
       }
     }
 

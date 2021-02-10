@@ -57,6 +57,7 @@ static inline void load_default_natives(VM* vm) {
   native(vm, "number", number_native);
   native(vm, "print", print_native);
   native(vm, "input", input_native);
+  native(vm, "length", length_native);
 }
 
 static inline bool falsey(Value value) {

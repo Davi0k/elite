@@ -85,3 +85,15 @@ Value input_native(int count, Value* arguments, Handler* handler) {
   
   return error(handler, run_time_errors[EXPECT_ARGUMENTS_NUMBER], 2, 1, count);
 }
+
+Value length_native(int count, Value* arguments, Handler* handler) {
+  if (count == 1) {
+    Value value = arguments[0];
+
+    if (IS_STRING(value) == true) 
+      return OBJECT(allocate_number_from_double(handler->vm, AS_STRING(value)->length));
+    else return error(handler, run_time_errors[MUST_BE_STRING], 0);
+  } 
+  
+  return error(handler, run_time_errors[EXPECT_ARGUMENTS_NUMBER], 2, 1, count);
+}
