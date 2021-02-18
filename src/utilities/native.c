@@ -97,3 +97,31 @@ Value length_native(int count, Value* arguments, Handler* handler) {
   
   return error(handler, run_time_errors[EXPECT_ARGUMENTS_NUMBER], 2, 1, count);
 }
+
+Value type_native(int count, Value* arguments, Handler* handler) {
+  if (count == 1) {
+    Value value = arguments[0];
+
+    char* type = NULL;
+
+    switch (value.type) {
+      case VALUE_BOOLEAN: type = "boolean"; break;
+      case VALUE_VOID: type = "void"; break;
+      case VALUE_UNDEFINED: type = "undefined"; break;
+    }
+
+    if (value.type == VALUE_OBJECT) {
+      if (IS_NUMBER(value) == true) type = "number";
+      if (IS_STRING(value) == true) type = "string";
+      if (IS_FUNCTION(value) == true || IS_CLOSURE(value) == true) type = "function";
+      if (IS_NATIVE(value) == true) type = "native";
+      if (IS_CLASS(value) == true) type = "class";
+      if (IS_INSTANCE(value) == true) type = "instance";
+      if (IS_BOUND(value) == true) type = "method";
+    }
+
+    return OBJECT(copy_string(handler->vm, type, strlen(type)));
+  } 
+  
+  return error(handler, run_time_errors[EXPECT_ARGUMENTS_NUMBER], 2, 1, count);
+}

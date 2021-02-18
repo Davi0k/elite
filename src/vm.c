@@ -58,6 +58,7 @@ static inline void load_default_natives(VM* vm) {
   native(vm, "print", print_native);
   native(vm, "input", input_native);
   native(vm, "length", length_native);
+  native(vm, "type", type_native);
 }
 
 static inline bool falsey(Value value) {
@@ -269,11 +270,13 @@ static Results run(VM* vm) {
 
   #define COMPUTE_NEXT() goto *jump_table[READ_BYTE()]
 
-  #define BINARY_OPERATION(operator) \
+  #define BINARY_OPERATION(operator, check) \
     do { \
-      if (!IS_NUMBER(peek(&vm->stack, 0)) || !IS_NUMBER(peek(&vm->stack, 1))) { \
-        error(vm, run_time_errors[MUST_BE_NUMBERS]); \
-        return INTERPRET_RUNTIME_ERROR; \
+      if (check) { \
+        if (!IS_NUMBER(peek(&vm->stack, 0)) || !IS_NUMBER(peek(&vm->stack, 1))) { \
+          error(vm, run_time_errors[MUST_BE_NUMBERS]); \
+          return INTERPRET_RUNTIME_ERROR; \
+        } \
       } \
       Value right = pop(&vm->stack, 1); Value left = pop(&vm->stack, 1); \
       mpf_t result; mpf_init(result); \
@@ -282,20 +285,22 @@ static Results run(VM* vm) {
       mpf_clear(result); \
     } while(false) 
 
-  #define BINARY_COMPARISON(operator) \
+  #define BINARY_COMPARISON(operator, check) \
     do { \
-      if (IS_NUMBER(peek(&vm->stack, 0)) && IS_NUMBER(peek(&vm->stack, 1))) { \
-        Value right = pop(&vm->stack, 1); Value left = pop(&vm->stack, 1); \
-        bool comparison = mpf_cmp(AS_NUMBER(left)->content, AS_NUMBER(right)->content) operator 0; \
-        push(&vm->stack, BOOLEAN(comparison)); \
-        COMPUTE_NEXT(); \
-      } \
-      if (IS_STRING(peek(&vm->stack, 0)) && IS_STRING(peek(&vm->stack, 1))) { \
-        String* right = AS_STRING(pop(&vm->stack, 1)); String* left = AS_STRING(pop(&vm->stack, 1)); \
-        bool comparison = left->length operator right->length; \
-        if (left->length == right->length) comparison = memcmp(left->content, right->content, left->length) operator 0; \
-        push(&vm->stack, BOOLEAN(comparison)); \
-        COMPUTE_NEXT(); \
+      if (check) { \
+        if (IS_NUMBER(peek(&vm->stack, 0)) && IS_NUMBER(peek(&vm->stack, 1))) { \
+          Value right = pop(&vm->stack, 1); Value left = pop(&vm->stack, 1); \
+          bool comparison = mpf_cmp(AS_NUMBER(left)->content, AS_NUMBER(right)->content) operator 0; \
+          push(&vm->stack, BOOLEAN(comparison)); \
+          COMPUTE_NEXT(); \
+        } \
+        if (IS_STRING(peek(&vm->stack, 0)) && IS_STRING(peek(&vm->stack, 1))) { \
+          String* right = AS_STRING(pop(&vm->stack, 1)); String* left = AS_STRING(pop(&vm->stack, 1)); \
+          bool comparison = left->length operator right->length; \
+          if (left->length == right->length) comparison = memcmp(left->content, right->content, left->length) operator 0; \
+          push(&vm->stack, BOOLEAN(comparison)); \
+          COMPUTE_NEXT(); \
+        } \
       } \
       error(vm, run_time_errors[MUST_BE_NUMBERS_OR_STRINGS]); \
       return INTERPRET_RUNTIME_ERROR; \
@@ -365,7 +370,7 @@ static Results run(VM* vm) {
     }
 
     if (IS_NUMBER(peek(&vm->stack, 0)) && IS_NUMBER(peek(&vm->stack, 1))) {
-      BINARY_OPERATION(mpf_add);
+      BINARY_OPERATION(mpf_add, false);
 
       COMPUTE_NEXT();
     }
@@ -375,11 +380,27 @@ static Results run(VM* vm) {
     return INTERPRET_RUNTIME_ERROR;
   }
 
-  OP_SUBTRACT: BINARY_OPERATION(mpf_sub); COMPUTE_NEXT();
+  OP_SUBTRACT: BINARY_OPERATION(mpf_sub, true); COMPUTE_NEXT();
 
-  OP_MULTIPLY: BINARY_OPERATION(mpf_mul); COMPUTE_NEXT();
+  OP_MULTIPLY: BINARY_OPERATION(mpf_mul, true); COMPUTE_NEXT();
 
-  OP_DIVIDE: BINARY_OPERATION(mpf_div); COMPUTE_NEXT();
+  OP_DIVIDE: {
+    if (!IS_NUMBER(peek(&vm->stack, 0)) || !IS_NUMBER(peek(&vm->stack, 1))) {
+      error(vm, run_time_errors[MUST_BE_NUMBERS]);
+
+      return INTERPRET_RUNTIME_ERROR;
+    }
+
+    if (mpf_cmp_ui(AS_NUMBER(peek(&vm->stack, 0))->content, 0) == 0) {
+      error(vm, run_time_errors[CANNOT_DIVIDE_BY_ZERO]);
+
+      return INTERPRET_RUNTIME_ERROR;
+    }
+
+    BINARY_OPERATION(mpf_div, false); 
+
+    COMPUTE_NEXT();
+  }
 
   OP_POWER: {
     if (!IS_NUMBER(peek(&vm->stack, 0)) || !IS_NUMBER(peek(&vm->stack, 1))) { 
@@ -422,9 +443,9 @@ static Results run(VM* vm) {
     COMPUTE_NEXT();
   }
 
-  OP_GREATER: BINARY_COMPARISON(>); COMPUTE_NEXT();
+  OP_GREATER: BINARY_COMPARISON(>, true); COMPUTE_NEXT();
 
-  OP_LESS: BINARY_COMPARISON(<); COMPUTE_NEXT();
+  OP_LESS: BINARY_COMPARISON(<, true); COMPUTE_NEXT();
 
   OP_GLOBAL_INITIALIZE: {
     String* identifier = AS_STRING(READ_CONSTANT());

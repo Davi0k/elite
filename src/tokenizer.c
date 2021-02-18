@@ -101,8 +101,7 @@ static void skip_whitespace(Tokenizer* tokenizer) {
 static bool alpha(char character) {
   return (character >= 'a' && character <= 'z') ||
          (character >= 'A' && character <= 'Z') ||
-         character == '_' || 
-         character == '$';
+         character == '_';
 }
 
 static bool digit(char character) {

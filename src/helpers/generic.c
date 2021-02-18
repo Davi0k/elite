@@ -52,6 +52,7 @@ const char* compile_time_errors[] = {
 const char* run_time_errors[] = {
   [EXPECT_ARGUMENTS_NUMBER] = "Expected %d arguments but got %d.",
   [CANNOT_CALL] = "Can only call functions and classes.",
+  [CANNOT_DIVIDE_BY_ZERO] = "Cannot divide by zero.",
   [CANNOT_HAVE_PROPERTIES] = "Only instances can have fields.",
   [MUST_BE_NUMBER] = "Operand must be a Number.",
   [MUST_BE_NUMBERS] = "Operands must be Numbers.",
