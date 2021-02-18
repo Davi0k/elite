@@ -51,7 +51,7 @@ void roots(VM* vm, Parents* parents) {
 
   Table* table = &vm->globals;
 
-  for (int i = 0; i < table->capacity; i++) {
+  for (int i = 0; i <= table->capacity; i++) {
     Entry* entry = &table->entries[i];
     mark(parents, OBJECT(entry->key));
     mark(parents, entry->value);
@@ -97,13 +97,13 @@ void traverse(VM* vm, Parents* parents) {
 
         mark(parents, OBJECT(class->identifier));
 
-        for (int i = 0; i < class->members.capacity; i++) {
+        for (int i = 0; i <= class->members.capacity; i++) {
           Entry* entry = &class->members.entries[i];
           mark(parents, OBJECT(entry->key));
           mark(parents, entry->value);
         }
 
-        for (int i = 0; i < class->methods.capacity; i++) {
+        for (int i = 0; i <= class->methods.capacity; i++) {
           Entry* entry = &class->methods.entries[i];
           mark(parents, OBJECT(entry->key));
           mark(parents, entry->value);
@@ -118,7 +118,7 @@ void traverse(VM* vm, Parents* parents) {
 
         mark(parents, OBJECT(instance->class));
 
-        for (int i = 0; i < instance->fields.capacity; i++) {
+        for (int i = 0; i <= instance->fields.capacity; i++) {
           Entry* entry = &instance->fields.entries[i];
           mark(parents, OBJECT(entry->key));
           mark(parents, entry->value);

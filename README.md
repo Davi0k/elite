@@ -125,7 +125,7 @@ while true: {
     #Get inputs and convert them using the specifics Native Functions
     set x: number(input()), y: number(input()); 
 
-    print("Insert an operator (+, -, *, /):");
+    print("Insert an operator (+, -, *, /, ^):");
     
     set operator: input();
 
@@ -133,6 +133,7 @@ while true: {
     if operator == '-': result = x - y;
     if operator == '*': result = x * y;
     if operator == '/': result = x / y;
+    if operator == '^': result = x ^ y;
 
     print("The result is: ", result); #Print the result
 }

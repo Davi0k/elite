@@ -15,7 +15,7 @@
   ( (capacity) < MINIMUM_CAPACITY ? MINIMUM_CAPACITY : (capacity) * LOAD_FACTOR )
 
 #define ALLOCATE(vm, type, count) \
-  (type*)reallocate(vm, NULL, 0, sizeof(type) * count)
+  (type*)reallocate(vm, NULL, 0, sizeof(type) * (count) )
 
 #define ALLOCATE_ARRAY(vm, type, pointer, oldest, newest) \
   (type*)reallocate( vm, pointer, sizeof(type) * (oldest), sizeof(type) * (newest) )

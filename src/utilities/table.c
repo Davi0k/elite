@@ -7,18 +7,18 @@
 
 void initialize_table(Table* table, VM* vm) {
   table->count = 0;
-  table->capacity = 0;
+  table->capacity = -1;
   table->entries = NULL;
 
   table->vm = vm;
 }
 
 void free_table(Table* table) {
-  FREE_ARRAY(table->vm, Entry, table->entries, table->capacity);
+  FREE_ARRAY(table->vm, Entry, table->entries, table->capacity + 1);
 }
 
 static Entry* find_entry(Entry* entries, int capacity, String* key) {
-  uint32_t index = key->hash % capacity;
+  uint32_t index = key->hash & capacity;
 
   Entry* tombstone = NULL;
 
@@ -38,21 +38,21 @@ static Entry* find_entry(Entry* entries, int capacity, String* key) {
     if (entry->key == key)
       return entry;
 
-    index = (index + 1) % capacity;
+    index = (index + 1) & capacity;
   }
 }
 
 static void fix_capacity(Table* table, int capacity) {
-  Entry* entries = ALLOCATE(table->vm, Entry, capacity);
+  Entry* entries = ALLOCATE(table->vm, Entry, capacity + 1);
 
-  for (int i = 0; i < capacity; i++) {
+  for (int i = 0; i <= capacity; i++) {
     entries[i].key = NULL;
     entries[i].value = UNDEFINED;
   }
 
   table->count = 0;
 
-  for (int i = 0; i < table->capacity; i++) {
+  for (int i = 0; i <= table->capacity; i++) {
     Entry* entry = &table->entries[i];
     if (entry->key == NULL) continue;
 
@@ -63,15 +63,15 @@ static void fix_capacity(Table* table, int capacity) {
     table->count++;
   }
 
-  FREE_ARRAY(table->vm, Entry, table->entries, table->capacity);
+  FREE_ARRAY(table->vm, Entry, table->entries, table->capacity + 1);
 
   table->entries = entries;
   table->capacity = capacity;
 }
 
 bool table_set(Table* table, String* key, Value value) {
-  if (table->count + 1 > table->capacity * MAX_LOAD) {
-    int capacity = GROW_CAPACITY(table->capacity);
+  if (table->count + 1 > (table->capacity + 1) * MAX_LOAD) {
+    int capacity = GROW_CAPACITY(table->capacity + 1) - 1;
     fix_capacity(table, capacity);
   }
 
@@ -113,7 +113,7 @@ bool table_delete(Table* table, String* key) {
 }
 
 void table_clear(Table* table) {
-  for (int i = 0; i < table->capacity; i++) {
+  for (int i = 0; i <= table->capacity; i++) {
     Entry* entry = &table->entries[i];
 
     if (entry->key != NULL && entry->key->object.mark == false)
@@ -122,7 +122,7 @@ void table_clear(Table* table) {
 }
 
 void table_append(Table* from, Table* to) {
-  for (int i = 0; i < from->capacity; i++) {
+  for (int i = 0; i <= from->capacity; i++) {
     Entry* entry = &from->entries[i];
 
     if (entry->key != NULL) 
@@ -133,7 +133,7 @@ void table_append(Table* from, Table* to) {
 String* table_find_string(Table* table, const char* content, int length, uint32_t hash) {
   if (table->count == 0) return NULL;
 
-  uint32_t index = hash % table->capacity;
+  uint32_t index = hash & table->capacity;
 
   while (true) {
     Entry* entry = &table->entries[index];
@@ -144,7 +144,7 @@ String* table_find_string(Table* table, const char* content, int length, uint32_
     if (entry->key->length == length && entry->key->hash == hash && memcmp(entry->key->content, content, length) == 0)
       return entry->key;
 
-    index = (index + 1) % table->capacity;
+    index = (index + 1) & table->capacity;
   }
 }
 
