@@ -18,13 +18,13 @@
   (type*)reallocate(vm, NULL, 0, sizeof(type) * (count) )
 
 #define ALLOCATE_ARRAY(vm, type, pointer, oldest, newest) \
-  (type*)reallocate( vm, pointer, sizeof(type) * (oldest), sizeof(type) * (newest) )
+  (type*)reallocate( vm, (pointer), sizeof(type) * (oldest), sizeof(type) * (newest) )
 
 #define FREE(vm, type, pointer) \
-  reallocate(vm, pointer, sizeof(type), 0)
+  reallocate(vm, (pointer), sizeof(type), 0)
 
 #define FREE_ARRAY(vm, type, pointer, capacity) \
-  reallocate( vm, pointer, sizeof(type) * (capacity), 0 )
+  reallocate( vm, (pointer), sizeof(type) * (capacity), 0 )
 
 typedef struct {
   int count;

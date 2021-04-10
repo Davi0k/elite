@@ -56,6 +56,23 @@ void roots(VM* vm, Parents* parents) {
     mark(parents, OBJECT(entry->key));
     mark(parents, entry->value);
   }
+
+  Table* prototypes[] = {
+    &OBJECT_PROTOTYPE.properties,
+    &NUMBER_PROTOTYPE.properties,
+    &STRING_PROTOTYPE.properties
+  };
+
+  for (int counter = 0; counter < 3; counter++) {
+    Table* prototype = prototypes[counter];
+
+    for (int i = 0; i <= prototype->capacity; i++) {
+      Entry* entry = &prototype->entries[i];
+      mark(parents, OBJECT(entry->key));
+      mark(parents, entry->value);
+    }
+
+  }
 }
 
 void traverse(VM* vm, Parents* parents) {
@@ -129,11 +146,15 @@ void traverse(VM* vm, Parents* parents) {
 
       case OBJECT_BOUND: {
         Bound* bound = (Bound*)object;
-
         mark(parents, bound->receiver);
-
         mark(parents, OBJECT(bound->method));
+        break;
+      }
 
+      case OBJECT_NATIVE_BOUND: {
+        NativeBound* native_bound = (NativeBound*)object;
+        mark(parents, native_bound->receiver);
+        mark(parents, OBJECT(native_bound->method));
         break;
       }
     }
@@ -149,7 +170,7 @@ void mark(Parents* parents, Value value) {
 
       object->mark = true;
 
-      if (object->type == OBJECT_STRING || object->type == OBJECT_NATIVE_FUNCTION) return;
+      if (object->type == OBJECT_STRING || object->type == OBJECT_NATIVE_FUNCTION || object->type == OBJECT_NATIVE_METHOD) return;
 
       if (parents->capacity < parents->count + 1) {
         parents->capacity = GROW_CAPACITY(parents->capacity);
@@ -229,6 +250,11 @@ void free_object(VM* vm, Object* object) {
       break;
     }
 
+    case OBJECT_NATIVE_METHOD: {
+      FREE(vm, NativeMethod, object);
+      break;
+    }
+
     case OBJECT_CLASS: {
       Class* class = (Class*)object;
       free_table(&class->members);
@@ -246,6 +272,11 @@ void free_object(VM* vm, Object* object) {
 
     case OBJECT_BOUND: {
       FREE(vm, Bound, object);
+      break;
+    }
+
+    case OBJECT_NATIVE_BOUND: {
+      FREE(vm, NativeBound, object);
       break;
     }
   }

@@ -9,8 +9,10 @@
 #include "types/object.h"
 
 void load_native_function(VM* vm, const char* identifier, CFunction c_function) {
-  push(&vm->stack, OBJECT(copy_string(vm, identifier, (int)strlen(identifier))));
-  push(&vm->stack, OBJECT(new_native_function(vm, c_function)));
+  String* string = copy_string(vm, identifier, (int)strlen(identifier));
+
+  push(&vm->stack, OBJECT(string));
+  push(&vm->stack, OBJECT(new_native_function(vm, c_function, string)));
 
   table_set(&vm->globals, AS_STRING(vm->stack.content[0]), vm->stack.content[1]);
 
@@ -116,6 +118,7 @@ Value type_native(int count, Value* arguments, Handler* handler) {
       if (IS_CLASS(value) == true) type = "class";
       if (IS_INSTANCE(value) == true) type = "instance";
       if (IS_BOUND(value) == true) type = "method";
+      if (IS_NATIVE_BOUND(value) == true) type = "native_method";
     }
 
     return OBJECT(copy_string(handler->vm, type, strlen(type)));

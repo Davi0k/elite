@@ -117,15 +117,17 @@ Closure* new_closure(VM* vm, Function* function) {
   return closure;
 }
 
-NativeFunction* new_native_function(VM* vm, CFunction c_function) {
+NativeFunction* new_native_function(VM* vm, CFunction c_function, String* identifier) {
   NativeFunction* native_function = ALLOCATE_OBJECT(vm, NativeFunction, OBJECT_NATIVE_FUNCTION, &OBJECT_PROTOTYPE);
   native_function->c_function = c_function;
+  native_function->identifier = identifier;
   return native_function;
 }
 
-NativeMethod* new_native_method(VM* vm, CMethod c_method) {
+NativeMethod* new_native_method(VM* vm, CMethod c_method, String* identifier) {
   NativeMethod* native_method = ALLOCATE_OBJECT(vm, NativeMethod, OBJECT_NATIVE_METHOD, &OBJECT_PROTOTYPE);
   native_method->c_method = c_method;
+  native_method->identifier = identifier;
   return native_method;
 }
 
@@ -191,7 +193,7 @@ void print_object(Value value) {
       break;
     }
 
-    case OBJECT_NATIVE_FUNCTION: printf("<NativeFunction>"); break;
+    case OBJECT_NATIVE_FUNCTION: printf("<NativeFunction %s>", AS_NATIVE_FUNCTION(value)->identifier->content); break;
 
     case OBJECT_CLASS: printf("<Class %s>", AS_CLASS(value)->identifier->content); break;
 
@@ -199,6 +201,6 @@ void print_object(Value value) {
 
     case OBJECT_BOUND: printf("<Method %s>", AS_BOUND(value)->method->function->identifier->content); break;
 
-    case OBJECT_NATIVE_BOUND: printf("<NativeMethod>"); break;
+    case OBJECT_NATIVE_BOUND: printf("<NativeMethod %s>", AS_NATIVE_BOUND(value)->method->identifier->content); break;
   }
 }

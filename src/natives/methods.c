@@ -12,14 +12,6 @@ Prototype
   NUMBER_PROTOTYPE,
   STRING_PROTOTYPE;
 
-static void load_native_method(VM* vm, Prototype* prototype, const char* identifier, CMethod c_method) {
-  NativeMethod* native_method = new_native_method(vm, c_method);
-
-  String* name = copy_string(vm, identifier, (int)strlen(identifier));
-
-  table_set(&prototype->properties, name, OBJECT(native_method));
-}
-
 static void load_object_prototype(VM* vm, Prototype* prototype) {
   load_native_method(vm, prototype, "equals", equals_object_method);
 }
@@ -34,6 +26,14 @@ static void load_string_prototype(VM* vm, Prototype* prototype) {
   load_native_method(vm, prototype, "contains", contains_string_method);
   load_native_method(vm, prototype, "upper", upper_string_method);
   load_native_method(vm, prototype, "lower", lower_string_method);
+}
+
+void load_native_method(VM* vm, Prototype* prototype, const char* identifier, CMethod c_method) {
+  NativeMethod* native_method = new_native_method(vm, c_method, copy_string(vm, identifier, (int)strlen(identifier)));
+
+  String* name = copy_string(vm, identifier, (int)strlen(identifier));
+
+  table_set(&prototype->properties, name, OBJECT(native_method));
 }
 
 void load_default_native_methods(VM* vm) {

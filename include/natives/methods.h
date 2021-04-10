@@ -11,7 +11,11 @@ typedef struct Prototype {
   Table properties;
 } Prototype;
 
-void load_default_native_methods(VM* vm);
+void load_native_method(VM* vm, Prototype* prototype, const char* identifier, CMethod c_method);
+
+void load_object_prototype(VM* vm, Prototype* prototype);
+void load_number_prototype(VM* vm, Prototype* prototype);
+void load_string_prototype(VM* vm, Prototype* prototype);
 
 extern Prototype 
   OBJECT_PROTOTYPE,

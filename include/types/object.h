@@ -94,11 +94,13 @@ typedef struct Closure {
 typedef struct NativeFunction {
   Object object;
   CFunction c_function;
+  String* identifier;
 } NativeFunction;
 
 typedef struct NativeMethod {
   Object object;
   CMethod c_method;
+  String* identifier;
 } NativeMethod;
 
 typedef struct Class {
@@ -141,9 +143,9 @@ Function* new_function(VM* vm);
 
 Closure* new_closure(VM* vm, Function* function);
 
-NativeFunction* new_native_function(VM* vm, CFunction c_function);
+NativeFunction* new_native_function(VM* vm, CFunction c_function, String* identifier);
 
-NativeMethod* new_native_method(VM* vm, CMethod c_method);
+NativeMethod* new_native_method(VM* vm, CMethod c_method, String* identifier);
 
 Class* new_class(VM* vm, String* identifier);
 

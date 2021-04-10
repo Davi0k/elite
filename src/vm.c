@@ -15,8 +15,12 @@
 #define FRAME_INITIAL_CAPACITY 16
 
 void initialize_VM(VM* vm) {
+  mpf_set_default_prec(GMP_MAX_PRECISION);
+
   vm->objects = NULL;
   vm->upvalues = NULL;
+
+  vm->allocate = 0;
 
   vm->threshold = DEFAULT_THRESHOLD;
 
@@ -24,10 +28,13 @@ void initialize_VM(VM* vm) {
 
   vm->call.count = 0;
   vm->call.capacity = FRAME_INITIAL_CAPACITY;
-  vm->call.frames = ALLOCATE_ARRAY(vm, Frame, vm->call.frames, 0, vm->call.capacity);
+  vm->call.frames = ALLOCATE_ARRAY(vm, Frame, (vm->call.frames = NULL), 0, vm->call.capacity);
 
   initialize_table(&vm->strings, vm);
   initialize_table(&vm->globals, vm);
+
+  load_default_native_functions(vm);
+  load_default_native_methods(vm);
 }
 
 void free_VM(VM* vm) {
@@ -43,6 +50,10 @@ void free_VM(VM* vm) {
 
   free_table(&vm->strings); 
   free_table(&vm->globals); 
+
+  free_table(&OBJECT_PROTOTYPE.properties);
+  free_table(&NUMBER_PROTOTYPE.properties);
+  free_table(&STRING_PROTOTYPE.properties);
 }
 
 static inline bool falsey(Value value) {
@@ -77,7 +88,7 @@ static void error(VM* vm, const char* message, ...) {
     }
 
     if (counter != 0) 
-      fprintf(stderr, "- The above line repeats %d times. -\n", counter);
+      fprintf(stderr, "- The above line repeats %d times. -\n", (int)counter);
 
     error = instruction;
 
@@ -269,18 +280,6 @@ static bool native_bound(VM* vm, Table table, String* property) {
   push(&vm->stack, OBJECT(native_bound));
 
   return true;
-}
-
-static bool method(VM* vm, Class* class, String* identifier, int count) {
-  Value method;
-
-  if (table_get(&class->methods, identifier, &method) == false) {
-    error(vm, run_time_errors[UNDEFINED_PROPERTY], identifier->content);
-
-    return false;
-  }
-
-  return invoke(vm, AS_CLOSURE(method), count);
 }
 
 static Results run(VM* vm) {
@@ -708,10 +707,6 @@ static Results run(VM* vm) {
 
       if (bound(vm, instance->class->methods, property) == true)
         COMPUTE_NEXT();
-
-      error(vm, run_time_errors[UNDEFINED_PROPERTY], property->content);
-
-      return INTERPRET_RUNTIME_ERROR;
     }
 
     if (IS_OBJECT(receiver) == true) {
@@ -748,12 +743,16 @@ static Results run(VM* vm) {
         return call(vm, value, count);
       }
 
-      if (method(vm, instance->class, identifier, count) == false)
-        return INTERPRET_RUNTIME_ERROR;
+      Value method;
 
-      frame = &vm->call.frames[vm->call.count - 1];
+      if (table_get(&instance->class->methods, identifier, &method) == true) {
+        if (invoke(vm, AS_CLOSURE(method), count) == true) {
+          frame = &vm->call.frames[vm->call.count - 1];
 
-      COMPUTE_NEXT();
+          COMPUTE_NEXT();
+        }
+        else return INTERPRET_RUNTIME_ERROR;
+      }
     }
 
     if (IS_OBJECT(receiver) == true) {
@@ -818,11 +817,6 @@ static Results run(VM* vm) {
 }
 
 Results interpret(VM* vm, const char* source) {
-  mpf_set_default_prec(GMP_MAX_PRECISION);
-
-  load_default_native_functions(vm);
-  load_default_native_methods(vm);
-
   Function* function = compile(vm, source);
 
   if (function == NULL) return INTERPRET_COMPILE_ERROR;
