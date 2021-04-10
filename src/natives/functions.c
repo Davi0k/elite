@@ -1,32 +1,10 @@
-#include <string.h>
-#include <stdarg.h>
 #include <stdio.h>
+#include <string.h>
 #include <time.h>
 
-#include "utilities/native.h"
+#include "natives/functions.h"
+
 #include "types/object.h"
-
-static Value error(Handler* handler, const char* message, int count, ...) {
-  va_list list;
-
-  va_start(list, count);
-
-  handler->error = true;
-
-  vsprintf(handler->message, message, list);
-
-  va_end(list);
-
-  return UNDEFINED;
-}
-
-void set_handler(Handler* handler, VM* vm) {
-  handler->vm = vm;
-
-  handler->error = false;
-
-  strncpy(handler->message, run_time_errors[UNDEFINED_ERROR], LINE_LENGTH_MAX);
-}
 
 Value stopwatch_native(int count, Value* arguments, Handler* handler) {
   if (count == 0) {
@@ -35,7 +13,7 @@ Value stopwatch_native(int count, Value* arguments, Handler* handler) {
     return OBJECT(allocate_number_from_double(handler->vm, seconds));
   } 
 
-  return error(handler, run_time_errors[EXPECT_ARGUMENTS_NUMBER], 2, 0, count);
+  return throw(handler, run_time_errors[EXPECT_ARGUMENTS_NUMBER], 2, 0, count);
 }
 
 Value number_native(int count, Value* arguments, Handler* handler) {
@@ -51,10 +29,10 @@ Value number_native(int count, Value* arguments, Handler* handler) {
     if (IS_STRING(argument))
       return OBJECT(allocate_number_from_string(handler->vm, AS_STRING(argument)->content));
 
-    return error(handler, run_time_errors[MUST_BE_NUMBER_OR_STRING], 0);
+    return throw(handler, run_time_errors[MUST_BE_NUMBER_OR_STRING], 0);
   }
 
-  return error(handler, run_time_errors[EXPECT_ARGUMENTS_NUMBER], 2, 1, count);
+  return throw(handler, run_time_errors[EXPECT_ARGUMENTS_NUMBER], 2, 1, count);
 }
 
 Value print_native(int count, Value* arguments, Handler* handler) {
@@ -71,7 +49,7 @@ Value input_native(int count, Value* arguments, Handler* handler) {
     if (count == 1) {
       if (IS_STRING(arguments[0]) == true) 
         print_value(arguments[0]);
-      else return error(handler, run_time_errors[MUST_BE_STRING], 0);
+      else return throw(handler, run_time_errors[MUST_BE_STRING], 0);
     }
 
     char* content = NULL;
@@ -83,7 +61,7 @@ Value input_native(int count, Value* arguments, Handler* handler) {
     return OBJECT(copy_string(handler->vm, content, length - 1));
   } 
   
-  return error(handler, run_time_errors[EXPECT_ARGUMENTS_NUMBER], 2, 1, count);
+  return throw(handler, run_time_errors[EXPECT_ARGUMENTS_NUMBER], 2, 1, count);
 }
 
 Value length_native(int count, Value* arguments, Handler* handler) {
@@ -92,10 +70,10 @@ Value length_native(int count, Value* arguments, Handler* handler) {
 
     if (IS_STRING(value) == true) 
       return OBJECT(allocate_number_from_double(handler->vm, AS_STRING(value)->length));
-    else return error(handler, run_time_errors[MUST_BE_STRING], 0);
+    else return throw(handler, run_time_errors[MUST_BE_STRING], 0);
   } 
   
-  return error(handler, run_time_errors[EXPECT_ARGUMENTS_NUMBER], 2, 1, count);
+  return throw(handler, run_time_errors[EXPECT_ARGUMENTS_NUMBER], 2, 1, count);
 }
 
 Value type_native(int count, Value* arguments, Handler* handler) {
@@ -114,7 +92,7 @@ Value type_native(int count, Value* arguments, Handler* handler) {
       if (IS_NUMBER(value) == true) type = "number";
       if (IS_STRING(value) == true) type = "string";
       if (IS_FUNCTION(value) == true || IS_CLOSURE(value) == true) type = "function";
-      if (IS_NATIVE(value) == true) type = "native";
+      if (IS_NATIVE_FUNCTION(value) == true) type = "native_function";
       if (IS_CLASS(value) == true) type = "class";
       if (IS_INSTANCE(value) == true) type = "instance";
       if (IS_BOUND(value) == true) type = "method";
@@ -123,5 +101,5 @@ Value type_native(int count, Value* arguments, Handler* handler) {
     return OBJECT(copy_string(handler->vm, type, strlen(type)));
   } 
   
-  return error(handler, run_time_errors[EXPECT_ARGUMENTS_NUMBER], 2, 1, count);
+  return throw(handler, run_time_errors[EXPECT_ARGUMENTS_NUMBER], 2, 1, count);
 }

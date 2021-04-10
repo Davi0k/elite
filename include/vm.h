@@ -7,7 +7,6 @@
 
 #include "utilities/chunk.h"
 #include "utilities/table.h"
-#include "utilities/native.h"
 #include "types/stack.h"
 #include "types/value.h"
 
@@ -45,8 +44,6 @@ typedef struct VM {
 
 void initialize_VM(VM* vm);
 void free_VM(VM* vm);
-
-void native(VM* vm, const char* identifier, Internal internal);
 
 Results interpret(VM* vm, const char* source);
 

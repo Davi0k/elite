@@ -149,7 +149,7 @@ void mark(Parents* parents, Value value) {
 
       object->mark = true;
 
-      if (object->type == OBJECT_STRING || object->type == OBJECT_NATIVE) return;
+      if (object->type == OBJECT_STRING || object->type == OBJECT_NATIVE_FUNCTION) return;
 
       if (parents->capacity < parents->count + 1) {
         parents->capacity = GROW_CAPACITY(parents->capacity);
@@ -224,8 +224,8 @@ void free_object(VM* vm, Object* object) {
       break;
     }
 
-    case OBJECT_NATIVE: {
-      FREE(vm, Native, object);
+    case OBJECT_NATIVE_FUNCTION: {
+      FREE(vm, NativeFunction, object);
       break;
     }
 

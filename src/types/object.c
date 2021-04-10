@@ -22,18 +22,21 @@ static Object* allocate_object(VM* vm, size_t size, Objects type) {
 Number* allocate_number_from_gmp(VM* vm, mpf_t value) {
   Number* number = ALLOCATE_OBJECT(vm, Number, OBJECT_NUMBER);
   mpf_init_set(number->content, value);
+  number->prototype = &number_prototype;
   return number;
 }
 
 Number* allocate_number_from_double(VM* vm, double value) {
   Number* number = ALLOCATE_OBJECT(vm, Number, OBJECT_NUMBER);
   mpf_init_set_d(number->content, value);
+  number->prototype = &number_prototype;
   return number;
 }
 
 Number* allocate_number_from_string(VM* vm, const char* value) {
   Number* number = ALLOCATE_OBJECT(vm, Number, OBJECT_NUMBER);
   mpf_init_set_str(number->content, value, 10);
+  number->prototype = &number_prototype;
   return number;
 }
 
@@ -116,10 +119,16 @@ Closure* new_closure(VM* vm, Function* function) {
   return closure;
 }
 
-Native* new_native(VM* vm, Internal internal) {
-  Native* native = ALLOCATE_OBJECT(vm, Native, OBJECT_NATIVE);
-  native->internal = internal;
-  return native;
+NativeFunction* new_native_function(VM* vm, CFunction c_function) {
+  NativeFunction* native_function = ALLOCATE_OBJECT(vm, NativeFunction, OBJECT_NATIVE_FUNCTION);
+  native_function->c_function = c_function;
+  return native_function;
+}
+
+NativeMethod* new_native_method(VM* vm, CMethod c_method) {
+  NativeMethod* native_method = ALLOCATE_OBJECT(vm, NativeMethod, OBJECT_NATIVE_METHOD);
+  native_method->c_method = c_method;
+  return native_method;
 }
 
 Class* new_class(VM* vm, String* identifier) {
@@ -175,7 +184,9 @@ void print_object(Value value) {
       break;
     }
 
-    case OBJECT_NATIVE: printf("<Native Function>"); break;
+    case OBJECT_NATIVE_FUNCTION: printf("<NativeFunction>"); break;
+
+    case OBJECT_NATIVE_METHOD: printf("<NativeMethod>"); break;
 
     case OBJECT_CLASS: printf("<Class %s>", AS_CLASS(value)->identifier->content); break;
 

@@ -7,6 +7,8 @@
 #include "compiler.h"
 #include "types/object.h"
 #include "utilities/memory.h"
+#include "natives/functions.h"
+#include "natives/prototypes.h"
 
 #define DEFAULT_THRESHOLD 1024 * 64
 
@@ -41,24 +43,6 @@ void free_VM(VM* vm) {
 
   free_table(&vm->strings); 
   free_table(&vm->globals); 
-}
-
-void native(VM* vm, const char* identifier, Internal internal) {
-  push(&vm->stack, OBJECT(copy_string(vm, identifier, (int)strlen(identifier))));
-  push(&vm->stack, OBJECT(new_native(vm, internal)));
-
-  table_set(&vm->globals, AS_STRING(vm->stack.content[0]), vm->stack.content[1]);
-
-  pop(&vm->stack, 2);
-}
-
-static inline void load_default_natives(VM* vm) {
-  native(vm, "stopwatch", stopwatch_native);
-  native(vm, "number", number_native);
-  native(vm, "print", print_native);
-  native(vm, "input", input_native);
-  native(vm, "length", length_native);
-  native(vm, "type", type_native);
 }
 
 static inline bool falsey(Value value) {
@@ -110,6 +94,25 @@ static void error(VM* vm, const char* message, ...) {
   }
 }
 
+static bool invoke_native_method(VM* vm, Value receiver, NativeMethod* native_method, int count) {
+  Handler handler;
+
+  set_handler(&handler, vm);
+
+  CMethod c_method = native_method->c_method;
+
+  Value result = c_method(receiver, count, vm->stack.top - count, &handler);
+
+  vm->stack.top -= count + 1;
+
+  push(&vm->stack, result);
+
+  if (handler.error == true)
+    error(vm, handler.message);
+  
+  return !handler.error;
+}
+
 static bool invoke(VM* vm, Closure* closure, int count) {
   if (count != closure->function->arity) {
     error(vm, run_time_errors[EXPECT_ARGUMENTS_NUMBER], closure->function->arity, count);
@@ -144,14 +147,14 @@ static bool call(VM* vm, Value value, int count) {
       return invoke(vm, AS_CLOSURE(value), count);
 
     switch (OBJECT_TYPE(value)) {
-      case OBJECT_NATIVE: {
+      case OBJECT_NATIVE_FUNCTION: {
         Handler handler;
 
         set_handler(&handler, vm);
 
-        Internal internal = AS_NATIVE(value)->internal;
+        CFunction c_function = AS_NATIVE_FUNCTION(value)->c_function;
 
-        Value result = internal(count, vm->stack.top - count, &handler);
+        Value result = c_function(count, vm->stack.top - count, &handler);
 
         vm->stack.top -= count + 1;
 
@@ -700,28 +703,47 @@ static Results run(VM* vm) {
 
     Value receiver = peek(&vm->stack, count);
 
-    if (IS_INSTANCE(receiver) == false) {
-      error(vm, run_time_errors[ONLY_INSTANCES_HAVE_METHODS]);
+    if (IS_INSTANCE(receiver) == true) {
+      Instance* instance = AS_INSTANCE(receiver);
+
+      Value value;
+
+      if (table_get(&instance->fields, identifier, &value) == true) {
+        vm->stack.top[- count - 1] = value;
+        
+        return call(vm, value, count);
+      }
+
+      if (method(vm, instance->class, identifier, count) == false)
+        return INTERPRET_RUNTIME_ERROR;
+
+      frame = &vm->call.frames[vm->call.count - 1];
+
+      COMPUTE_NEXT();
+    }
+
+    if (IS_NUMBER(receiver) == true) {
+      Number* number = AS_NUMBER(receiver);
+
+      Value value;
+
+      if (table_get(&number->prototype->methods, identifier, &value) == true) {
+        vm->stack.top[- count - 1] = value;
+
+        if(invoke_native_method(vm, receiver, AS_NATIVE_METHOD(value), count) == false)
+          return INTERPRET_RUNTIME_ERROR;
+
+        COMPUTE_NEXT();
+      }
+
+      error(vm, run_time_errors[UNDEFINED_METHOD], identifier->content);
 
       return INTERPRET_RUNTIME_ERROR;
     }
 
-    Instance* instance = AS_INSTANCE(receiver);
+    error(vm, run_time_errors[DONT_SUPPORT_METHODS]);
 
-    Value value;
-
-    if (table_get(&instance->fields, identifier, &value) == true) {
-      vm->stack.top[- count - 1] = value;
-      
-      return call(vm, value, count);
-    }
-
-    if (method(vm, instance->class, identifier, count) == false)
-      return INTERPRET_RUNTIME_ERROR;
-
-    frame = &vm->call.frames[vm->call.count - 1];
-
-    COMPUTE_NEXT();
+    return INTERPRET_RUNTIME_ERROR;
   }
 
   OP_INHERIT: {
@@ -764,7 +786,8 @@ static Results run(VM* vm) {
 Results interpret(VM* vm, const char* source) {
   mpf_set_default_prec(GMP_MAX_PRECISION);
 
-  load_default_natives(vm);
+  load_default_native_functions(vm);
+  load_default_native_methods(vm);
 
   Function* function = compile(vm, source);
 

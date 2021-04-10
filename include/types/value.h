@@ -4,15 +4,16 @@
 #include "common.h"
 
 typedef struct Object Object;
-typedef struct Upvalue Upvalue;
 typedef struct Number Number;
 typedef struct String String;
+typedef struct Upvalue Upvalue;
 typedef struct Function Function;
 typedef struct Closure Closure;
+typedef struct NativeFunction NativeFunction;
+typedef struct NativeMethod NativeMethod;
 typedef struct Class Class;
 typedef struct Instance Instance;
 typedef struct Bound Bound;
-typedef struct Native Native;
 
 #define BOOLEAN(value) ( (Value){ VALUE_BOOLEAN, { .boolean = value } } )
 #define OBJECT(value) ( (Value){ VALUE_OBJECT, { .object = (Object*)value } } )

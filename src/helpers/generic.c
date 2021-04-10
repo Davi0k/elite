@@ -54,16 +54,17 @@ const char* run_time_errors[] = {
   [CANNOT_CALL] = "Can only call functions and classes.",
   [CANNOT_DIVIDE_BY_ZERO] = "Cannot divide by zero.",
   [CANNOT_HAVE_PROPERTIES] = "Only instances can have fields.",
+  [DONT_SUPPORT_METHODS] = "Methods are not supported for this type.",
   [MUST_BE_NUMBER] = "Operand must be a Number.",
   [MUST_BE_NUMBERS] = "Operands must be Numbers.",
   [MUST_BE_STRING] = "Operand must be a String.",
   [MUST_BE_STRINGS] = "Operands must be Strings.",
   [MUST_BE_NUMBER_OR_STRING] = "Operand must be a Number or a String.",
   [MUST_BE_NUMBERS_OR_STRINGS] = "Operands must be two Numbers or two Strings.",
-  [ONLY_INSTANCES_HAVE_METHODS] = "Only Instances have methods.",
   [STACK_OVERFLOW] = "A Stack Overflow error has occured.",
   [UNDEFINED_VARIABLE] = "Undefined variable '%s'.",
   [UNDEFINED_ERROR] = "Undefined Error Message.",
+  [UNDEFINED_METHOD] = "Undefined method '%s'.",
   [UNDEFINED_PROPERTY] = "Undefined property '%s'."
 };
 
