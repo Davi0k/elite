@@ -8,7 +8,7 @@
 #include "types/object.h"
 #include "utilities/memory.h"
 #include "natives/functions.h"
-#include "natives/prototypes.h"
+#include "natives/methods.h"
 
 #define DEFAULT_THRESHOLD 1024 * 64
 
@@ -192,6 +192,12 @@ static bool call(VM* vm, Value value, int count) {
         
         return invoke(vm, bound->method, count);
       }
+
+      case OBJECT_NATIVE_BOUND: {
+        NativeBound* native_bound = AS_NATIVE_BOUND(value);
+        
+        return invoke_native_method(vm, native_bound->receiver, native_bound->method, count);
+      }
     }
   }
 
@@ -246,6 +252,21 @@ static bool bound(VM* vm, Table table, String* property) {
   Bound* bound = new_bound(vm, receiver, closure);
 
   push(&vm->stack, OBJECT(bound));
+
+  return true;
+}
+
+static bool native_bound(VM* vm, Table table, String* property) {
+  Value method;
+
+  if (table_get(&table, property, &method) == false)
+    return false;
+
+  Value receiver = pop(&vm->stack, 1);
+  NativeMethod* native_method = AS_NATIVE_METHOD(method);
+  NativeBound* native_bound = new_native_bound(vm, receiver, native_method);
+
+  push(&vm->stack, OBJECT(native_bound));
 
   return true;
 }
@@ -664,16 +685,18 @@ static Results run(VM* vm) {
       return INTERPRET_RUNTIME_ERROR;
     }
 
-    error(vm, run_time_errors[CANNOT_HAVE_PROPERTIES]);
+    error(vm, run_time_errors[DONT_SUPPORT_PROPERTIES]);
 
     return INTERPRET_RUNTIME_ERROR;
   }
 
   OP_PROPERTY_GET: {
-    if (IS_INSTANCE(peek(&vm->stack, 0)) == true) {
-      Instance* instance = AS_INSTANCE(peek(&vm->stack, 0));
+    Value receiver = peek(&vm->stack, 0);
 
-      String* property = AS_STRING(READ_CONSTANT());
+    String* property = AS_STRING(READ_CONSTANT());
+
+    if (IS_INSTANCE(receiver) == true) {
+      Instance* instance = AS_INSTANCE(receiver);
 
       Value value;
 
@@ -691,7 +714,18 @@ static Results run(VM* vm) {
       return INTERPRET_RUNTIME_ERROR;
     }
 
-    error(vm, run_time_errors[CANNOT_HAVE_PROPERTIES]);
+    if (IS_OBJECT(receiver) == true) {
+      Object* object = AS_OBJECT(receiver);
+
+      if (native_bound(vm, object->prototype->properties, property) == true)
+        COMPUTE_NEXT();
+
+      error(vm, run_time_errors[UNDEFINED_PROPERTY], property->content);
+
+      return INTERPRET_RUNTIME_ERROR;
+    }
+
+    error(vm, run_time_errors[DONT_SUPPORT_PROPERTIES]);
 
     return INTERPRET_RUNTIME_ERROR;
   }
@@ -722,12 +756,12 @@ static Results run(VM* vm) {
       COMPUTE_NEXT();
     }
 
-    if (IS_NUMBER(receiver) == true) {
-      Number* number = AS_NUMBER(receiver);
-
+    if (IS_OBJECT(receiver) == true) {
       Value value;
 
-      if (table_get(&number->prototype->methods, identifier, &value) == true) {
+      Object* object = AS_OBJECT(receiver);
+
+      if (table_get(&object->prototype->properties, identifier, &value) == true) {
         vm->stack.top[- count - 1] = value;
 
         if(invoke_native_method(vm, receiver, AS_NATIVE_METHOD(value), count) == false)

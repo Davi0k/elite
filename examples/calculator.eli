@@ -4,7 +4,7 @@ set result: 0; #Define a global variable
 while true: {
     print("Input two Numbers:");
 
-    #Get inputs and convert them using the specifics NativeFunction Functions
+    #Get inputs and convert them using the specifics Native Functions
     set x: number(input()), y: number(input()); 
 
     print("Insert an operator (+, -, *, /, ^):");

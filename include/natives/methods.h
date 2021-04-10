@@ -8,11 +8,14 @@
 #include "utilities/table.h"
 
 typedef struct Prototype {
-  Table methods;
+  Table properties;
 } Prototype;
 
 void load_default_native_methods(VM* vm);
 
-extern Prototype number_prototype;
+extern Prototype 
+  OBJECT_PROTOTYPE,
+  NUMBER_PROTOTYPE,
+  STRING_PROTOTYPE;
 
 #endif

@@ -5,7 +5,7 @@
 
 #include "natives/handler.h"
 #include "natives/functions.h"
-#include "natives/prototypes.h"
+#include "natives/methods.h"
 #include "utilities/table.h"
 #include "utilities/chunk.h"
 #include "types/value.h"
@@ -20,6 +20,7 @@
 #define IS_CLASS(value) validate(value, OBJECT_CLASS)
 #define IS_INSTANCE(value) validate(value, OBJECT_INSTANCE)
 #define IS_BOUND(value) validate(value, OBJECT_BOUND)
+#define IS_NATIVE_BOUND(value) validate(value, OBJECT_NATIVE_BOUND)
 
 #define AS_NUMBER(value) ( (Number*)AS_OBJECT(value) )
 #define AS_STRING(value) ( (String*)AS_OBJECT(value) )
@@ -31,6 +32,7 @@
 #define AS_CLASS(value) ( (Class*)AS_OBJECT(value) )
 #define AS_INSTANCE(value) ( (Instance*)AS_OBJECT(value) )
 #define AS_BOUND(value) ( (Bound*)AS_OBJECT(value) )
+#define AS_NATIVE_BOUND(value) ( (NativeBound*)AS_OBJECT(value) )
 
 #define OBJECT_TYPE(value) ( AS_OBJECT(value)->type )
 
@@ -45,17 +47,18 @@ typedef enum {
   OBJECT_CLASS,
   OBJECT_INSTANCE,
   OBJECT_BOUND,
+  OBJECT_NATIVE_BOUND
 } Objects;
 
 typedef struct Object {
   Objects type;
+  Prototype* prototype;
   struct Object* next;
   bool mark;
 } Object;
 
 typedef struct Number {
   Object object;
-  Prototype* prototype;
   mpf_t content;
 } Number;
 
@@ -117,6 +120,12 @@ typedef struct Bound {
   Closure* method;
 } Bound;
 
+typedef struct NativeBound {
+  Object object;
+  Value receiver;
+  NativeMethod* method;
+} NativeBound;
+
 Number* allocate_number_from_gmp(VM* vm, mpf_t value);
 Number* allocate_number_from_double(VM* vm, double value);
 Number* allocate_number_from_string(VM* vm, const char* value);
@@ -141,6 +150,8 @@ Class* new_class(VM* vm, String* identifier);
 Instance* new_instance(VM* vm, Class* class);
 
 Bound* new_bound(VM* vm, Value receiver, Closure* method);
+
+NativeBound* new_native_bound(VM* vm, Value receiver, NativeMethod* method);
 
 void print_object(Value value);
 

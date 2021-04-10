@@ -15,8 +15,6 @@ typedef struct {
   char message[LINE_LENGTH_MAX];
 } Handler;
 
-void load_default_native_functions(VM* vm);
-
 void set_handler(Handler* handler, VM* vm);
 
 Value throw(Handler* handler, const char* message, int count, ...);

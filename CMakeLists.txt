@@ -10,8 +10,6 @@ file(GLOB_RECURSE UTILITIES "src/utilities/*.c")
 file(GLOB_RECURSE NATIVES "src/natives/*.c")
 file(GLOB_RECURSE TYPES "src/types/*.c")
 
-add_definitions("-g")
-
 add_executable(elite ${SOURCES} ${HELPERS} ${UTILITIES} ${NATIVES} ${TYPES})
 
 target_link_libraries(elite gmp)
