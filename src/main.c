@@ -7,16 +7,33 @@
 #include "vm.h"
 
 #define VERSION \
-  "Elite 1.0.0" \
-  "\nRepository: https://github.com/Davi0k/elite" \
-  "\nAbout me: https://davide.codes"
+  "Elite 1.0.0\n" \
+  "Repository: https://github.com/Davi0k/elite\n" \
+  "About me: https://davide.codes\n"
 
 #define HELP \
-  "Usage: elite [path] [-v] [-h]" \
-  "\n\tpath: The path of the script you want to execute." \
-  "\nOptions:" \
-  "\n\t-v: Returns the current interpreter's version." \
-  "\n\t-h: Returns a list of the available settings and options for the interpreter."
+  "Usage: elite [path] [-v] [-h]\n" \
+  "\tpath: The path of the script you want to execute.\n" \
+  "Options:\n" \
+  "\t-v: Returns the current interpreter's version.\n" \
+  "\t-h: Returns a list of the available settings and options for the interpreter.\n"
+
+static void repl(VM* vm) {
+  size_t size = 0;
+
+  char* line = NULL;
+
+  while(true) {
+    printf("> ");
+
+    if (getline(&line, &size, stdin) == -1) {
+      printf("\n");
+      break;
+    }
+
+    interpret(vm, line);
+  }
+}
 
 static void file(VM* vm, const char* path) {
   int code = 0;
@@ -48,9 +65,13 @@ static void file(VM* vm, const char* path) {
 }
 
 int main(int argc, const char* argv[]) {
+  mpf_set_default_prec(GMP_MAX_PRECISION);
+
   VM vm;
 
   initialize_VM(&vm);
+
+  if (argc == 1) repl(&vm);
 
   if (argc == 2)  {
     const char* parameter = argv[1];
@@ -71,7 +92,7 @@ int main(int argc, const char* argv[]) {
     else file(&vm, argv[1]);
   }
 
-  if (argc != 2) {
+  if (argc != 1 && argc != 2) {
     fprintf(stderr, "The correct syntax is: elite [path] [-v] [-h]");
     exit(64);
   }

@@ -14,6 +14,7 @@ typedef struct NativeMethod NativeMethod;
 typedef struct Class Class;
 typedef struct Instance Instance;
 typedef struct Bound Bound;
+typedef struct NativeBound NativeBound;
 
 #define BOOLEAN(value) ( (Value){ VALUE_BOOLEAN, { .boolean = value } } )
 #define OBJECT(value) ( (Value){ VALUE_OBJECT, { .object = (Object*)value } } )

@@ -15,20 +15,15 @@
 #define FRAME_INITIAL_CAPACITY 16
 
 void initialize_VM(VM* vm) {
-  mpf_set_default_prec(GMP_MAX_PRECISION);
-
   vm->objects = NULL;
-  vm->upvalues = NULL;
 
   vm->allocate = 0;
 
   vm->threshold = DEFAULT_THRESHOLD;
 
-  vm->stack.top = vm->stack.content;
+  reset_VM(vm);
 
-  vm->call.count = 0;
-  vm->call.capacity = FRAME_INITIAL_CAPACITY;
-  vm->call.frames = ALLOCATE_ARRAY(vm, Frame, (vm->call.frames = NULL), 0, vm->call.capacity);
+  initialize_prototypes(vm);
 
   initialize_table(&vm->strings, vm);
   initialize_table(&vm->globals, vm);
@@ -48,12 +43,20 @@ void free_VM(VM* vm) {
 
   FREE_ARRAY(vm, Frame, vm->call.frames, vm->call.capacity);
 
+  free_prototypes(vm);
+
   free_table(&vm->strings); 
   free_table(&vm->globals); 
+}
 
-  free_table(&OBJECT_PROTOTYPE.properties);
-  free_table(&NUMBER_PROTOTYPE.properties);
-  free_table(&STRING_PROTOTYPE.properties);
+void reset_VM(VM* vm) {
+  vm->stack.top = vm->stack.content;
+
+  vm->call.count = 0;
+  vm->call.capacity = FRAME_INITIAL_CAPACITY;
+  vm->call.frames = ALLOCATE_ARRAY(vm, Frame, (vm->call.frames = NULL), 0, vm->call.capacity);
+
+  vm->upvalues = NULL;
 }
 
 static inline bool falsey(Value value) {
@@ -103,6 +106,8 @@ static void error(VM* vm, const char* message, ...) {
 
     counter = 0;
   }
+
+  reset_VM(vm);
 }
 
 static bool invoke_native_method(VM* vm, Value receiver, NativeMethod* native_method, int count) {

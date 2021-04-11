@@ -11,15 +11,15 @@ typedef struct Prototype {
   Table properties;
 } Prototype;
 
-void load_native_method(VM* vm, Prototype* prototype, const char* identifier, CMethod c_method);
+typedef struct Prototypes {
+  Prototype object;
+  Prototype number;
+  Prototype string;
+} Prototypes;
 
-void load_object_prototype(VM* vm, Prototype* prototype);
-void load_number_prototype(VM* vm, Prototype* prototype);
-void load_string_prototype(VM* vm, Prototype* prototype);
+void load_default_native_methods(VM* vm);
 
-extern Prototype 
-  OBJECT_PROTOTYPE,
-  NUMBER_PROTOTYPE,
-  STRING_PROTOTYPE;
+void initialize_prototypes(VM* vm);
+void free_prototypes(VM* vm);
 
 #endif

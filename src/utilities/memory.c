@@ -1,3 +1,5 @@
+#include <stdio.h>
+
 #include "vm.h"
 #include "compiler.h"
 #include "utilities/memory.h"
@@ -58,9 +60,9 @@ void roots(VM* vm, Parents* parents) {
   }
 
   Table* prototypes[] = {
-    &OBJECT_PROTOTYPE.properties,
-    &NUMBER_PROTOTYPE.properties,
-    &STRING_PROTOTYPE.properties
+    &vm->prototypes.object.properties,
+    &vm->prototypes.number.properties,
+    &vm->prototypes.string.properties
   };
 
   for (int counter = 0; counter < 3; counter++) {
@@ -71,7 +73,6 @@ void roots(VM* vm, Parents* parents) {
       mark(parents, OBJECT(entry->key));
       mark(parents, entry->value);
     }
-
   }
 }
 
@@ -106,6 +107,16 @@ void traverse(VM* vm, Parents* parents) {
         for (int i = 0; i < closure->count; i++)
           mark(parents, OBJECT(closure->upvalues[i]));
 
+        break;
+      }
+
+      case OBJECT_NATIVE_FUNCTION: {
+        mark(parents, OBJECT(((NativeFunction*)object)->identifier));
+        break;
+      }
+
+      case OBJECT_NATIVE_METHOD: {
+        mark(parents, OBJECT(((NativeMethod*)object)->identifier));
         break;
       }
 
@@ -170,7 +181,7 @@ void mark(Parents* parents, Value value) {
 
       object->mark = true;
 
-      if (object->type == OBJECT_STRING || object->type == OBJECT_NATIVE_FUNCTION || object->type == OBJECT_NATIVE_METHOD) return;
+      if (object->type == OBJECT_NUMBER || object->type == OBJECT_STRING) return;
 
       if (parents->capacity < parents->count + 1) {
         parents->capacity = GROW_CAPACITY(parents->capacity);
@@ -191,8 +202,8 @@ void sweep(VM* vm) {
 
   while (object != NULL) {
     if (object->mark) {
+      object->mark = false;
       previous = object;
-
       object = object->next;
 
       continue;

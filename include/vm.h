@@ -9,6 +9,7 @@
 #include "utilities/table.h"
 #include "types/stack.h"
 #include "types/value.h"
+#include "natives/methods.h"
 
 typedef enum {
   INTERPRET_OK,
@@ -37,6 +38,8 @@ typedef struct VM {
 
   Table strings, globals;
 
+  Prototypes prototypes;
+
   Upvalue* upvalues;
 
   Object* objects;
@@ -44,6 +47,7 @@ typedef struct VM {
 
 void initialize_VM(VM* vm);
 void free_VM(VM* vm);
+void reset_VM(VM* vm);
 
 Results interpret(VM* vm, const char* source);
 

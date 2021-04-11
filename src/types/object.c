@@ -21,25 +21,25 @@ static Object* allocate_object(VM* vm, size_t size, Objects type, Prototype* pro
 }
 
 Number* allocate_number_from_gmp(VM* vm, mpf_t value) {
-  Number* number = ALLOCATE_OBJECT(vm, Number, OBJECT_NUMBER, &NUMBER_PROTOTYPE);
+  Number* number = ALLOCATE_OBJECT(vm, Number, OBJECT_NUMBER, &vm->prototypes.number);
   mpf_init_set(number->content, value);
   return number;
 }
 
 Number* allocate_number_from_double(VM* vm, double value) {
-  Number* number = ALLOCATE_OBJECT(vm, Number, OBJECT_NUMBER, &NUMBER_PROTOTYPE);
+  Number* number = ALLOCATE_OBJECT(vm, Number, OBJECT_NUMBER, &vm->prototypes.number);
   mpf_init_set_d(number->content, value);
   return number;
 }
 
 Number* allocate_number_from_string(VM* vm, const char* value) {
-  Number* number = ALLOCATE_OBJECT(vm, Number, OBJECT_NUMBER, &NUMBER_PROTOTYPE);
+  Number* number = ALLOCATE_OBJECT(vm, Number, OBJECT_NUMBER, &vm->prototypes.number);
   mpf_init_set_str(number->content, value, 10);
   return number;
 }
 
 String* allocate_string(VM* vm, const char* content, int length, uint32_t hash) {
-  String* string = ALLOCATE_OBJECT(vm, String, OBJECT_STRING, &STRING_PROTOTYPE);
+  String* string = ALLOCATE_OBJECT(vm, String, OBJECT_STRING, &vm->prototypes.string);
   string->content = (char*)content;
   string->length = length;
 
@@ -80,7 +80,7 @@ String* take_string(VM* vm, const char* content, int length) {
 }
 
 Upvalue* new_upvalue(VM* vm, Value* location) {
-  Upvalue* upvalue = ALLOCATE_OBJECT(vm, Upvalue, OBJECT_UPVALUE, &OBJECT_PROTOTYPE);
+  Upvalue* upvalue = ALLOCATE_OBJECT(vm, Upvalue, OBJECT_UPVALUE, &vm->prototypes.object);
 
   upvalue->location = location;
   upvalue->closed = UNDEFINED;
@@ -90,7 +90,7 @@ Upvalue* new_upvalue(VM* vm, Value* location) {
 }
 
 Function* new_function(VM* vm) {
-  Function* function = ALLOCATE_OBJECT(vm, Function, OBJECT_FUNCTION, &OBJECT_PROTOTYPE);
+  Function* function = ALLOCATE_OBJECT(vm, Function, OBJECT_FUNCTION, &vm->prototypes.object);
 
   function->arity = 0;
   function->count = 0;
@@ -109,7 +109,7 @@ Closure* new_closure(VM* vm, Function* function) {
   for (int i = 0; i < count; i++)
     upvalues[i] = NULL;
 
-  Closure* closure = ALLOCATE_OBJECT(vm, Closure, OBJECT_CLOSURE, &OBJECT_PROTOTYPE);
+  Closure* closure = ALLOCATE_OBJECT(vm, Closure, OBJECT_CLOSURE, &vm->prototypes.object);
   closure->function = function;
   closure->upvalues = upvalues;
   closure->count = count;
@@ -118,21 +118,21 @@ Closure* new_closure(VM* vm, Function* function) {
 }
 
 NativeFunction* new_native_function(VM* vm, CFunction c_function, String* identifier) {
-  NativeFunction* native_function = ALLOCATE_OBJECT(vm, NativeFunction, OBJECT_NATIVE_FUNCTION, &OBJECT_PROTOTYPE);
+  NativeFunction* native_function = ALLOCATE_OBJECT(vm, NativeFunction, OBJECT_NATIVE_FUNCTION, &vm->prototypes.object);
   native_function->c_function = c_function;
   native_function->identifier = identifier;
   return native_function;
 }
 
 NativeMethod* new_native_method(VM* vm, CMethod c_method, String* identifier) {
-  NativeMethod* native_method = ALLOCATE_OBJECT(vm, NativeMethod, OBJECT_NATIVE_METHOD, &OBJECT_PROTOTYPE);
+  NativeMethod* native_method = ALLOCATE_OBJECT(vm, NativeMethod, OBJECT_NATIVE_METHOD, &vm->prototypes.object);
   native_method->c_method = c_method;
   native_method->identifier = identifier;
   return native_method;
 }
 
 Class* new_class(VM* vm, String* identifier) {
-  Class* class = ALLOCATE_OBJECT(vm, Class, OBJECT_CLASS, &OBJECT_PROTOTYPE);
+  Class* class = ALLOCATE_OBJECT(vm, Class, OBJECT_CLASS, &vm->prototypes.object);
 
   class->identifier = identifier;
 
@@ -143,7 +143,7 @@ Class* new_class(VM* vm, String* identifier) {
 }
 
 Instance* new_instance(VM* vm, Class* class) {
-  Instance* instance = ALLOCATE_OBJECT(vm, Instance, OBJECT_INSTANCE, &OBJECT_PROTOTYPE);
+  Instance* instance = ALLOCATE_OBJECT(vm, Instance, OBJECT_INSTANCE, &vm->prototypes.object);
 
   instance->class = class;
 
@@ -155,7 +155,7 @@ Instance* new_instance(VM* vm, Class* class) {
 }
 
 Bound* new_bound(VM* vm, Value receiver, Closure* method) {
-  Bound* bound = ALLOCATE_OBJECT(vm, Bound, OBJECT_BOUND, &OBJECT_PROTOTYPE);
+  Bound* bound = ALLOCATE_OBJECT(vm, Bound, OBJECT_BOUND, &vm->prototypes.object);
 
   bound->receiver = receiver;
   bound->method = method;
@@ -164,7 +164,7 @@ Bound* new_bound(VM* vm, Value receiver, Closure* method) {
 }
 
 NativeBound* new_native_bound(VM* vm, Value receiver, NativeMethod* method) {
-  NativeBound* native_bound = ALLOCATE_OBJECT(vm, NativeBound, OBJECT_NATIVE_BOUND, &OBJECT_PROTOTYPE);
+  NativeBound* native_bound = ALLOCATE_OBJECT(vm, NativeBound, OBJECT_NATIVE_BOUND, &vm->prototypes.object);
 
   native_bound->receiver = receiver;
   native_bound->method = method;
